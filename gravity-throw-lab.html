@@ -1,0 +1,1759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gravity Throw Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050a12;
+    --surface: #0a1628;
+    --surface2: #0f1f3d;
+    --accent: #00e5ff;
+    --accent2: #ff6b35;
+    --accent3: #7fff00;
+    --text: #e0f0ff;
+    --muted: #4a6080;
+    --success: #00ff88;
+    --fail: #ff3366;
+    --glow: 0 0 20px rgba(0,229,255,0.4);
+    --glow2: 0 0 20px rgba(255,107,53,0.4);
+    --glow3: 0 0 20px rgba(127,255,0,0.4);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Starfield background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.4) 0%, transparent 100%),
+      radial-gradient(1px 1px at 60% 10%, rgba(255,255,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 80% 60%, rgba(255,255,255,0.2) 0%, transparent 100%),
+      radial-gradient(1px 1px at 40% 80%, rgba(255,255,255,0.35) 0%, transparent 100%),
+      radial-gradient(1px 1px at 90% 20%, rgba(255,255,255,0.25) 0%, transparent 100%),
+      radial-gradient(2px 2px at 10% 50%, rgba(0,229,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 70% 90%, rgba(255,255,255,0.2) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ===== HEADER ===== */
+  header {
+    text-align: center;
+    padding: 20px 20px 10px;
+    position: relative;
+    z-index: 10;
+    border-bottom: 1px solid rgba(0,229,255,0.15);
+  }
+
+  .logo {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(1.4rem, 4vw, 2.2rem);
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: 0.05em;
+    text-shadow: none;
+    filter: drop-shadow(0 0 20px rgba(0,229,255,0.5));
+  }
+
+  .motto {
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    margin-top: 4px;
+    text-transform: uppercase;
+  }
+
+  /* ===== MAIN LAYOUT ===== */
+  .app {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 0;
+    height: calc(100vh - 85px);
+    position: relative;
+    z-index: 5;
+  }
+
+  /* ===== SIDEBAR ===== */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid rgba(0,229,255,0.1);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+  }
+
+  .panel-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.25em;
+    color: var(--accent);
+    text-transform: uppercase;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(0,229,255,0.2);
+  }
+
+  /* Level selector */
+  .level-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+  }
+
+  .level-btn {
+    background: var(--surface2);
+    border: 1px solid rgba(0,229,255,0.15);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    padding: 8px 4px;
+    cursor: pointer;
+    border-radius: 4px;
+    text-align: center;
+    transition: all 0.2s;
+    line-height: 1.4;
+  }
+
+  .level-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .level-btn.active {
+    background: rgba(0,229,255,0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: var(--glow);
+  }
+  .level-btn.elevated {
+    border-color: rgba(127,255,0,0.3);
+    position: relative;
+  }
+  .level-btn.elevated::after {
+    content: '⬆';
+    position: absolute;
+    top: 3px;
+    right: 4px;
+    font-size: 0.5rem;
+    color: var(--accent3);
+  }
+  .level-btn.elevated.active { border-color: var(--accent3); color: var(--accent3); box-shadow: var(--glow3); }
+  .level-btn.elevated:hover { border-color: var(--accent3); color: var(--accent3); }
+  .level-btn .level-icon { font-size: 1rem; display: block; margin-bottom: 2px; }
+
+  /* Controls */
+  .control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .control-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.65rem;
+    color: var(--muted);
+  }
+
+  .control-value {
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  /* Numeric input fields */
+  .num-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  input[type=number] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 36px;
+    background: var(--surface2);
+    border: 1px solid rgba(0,229,255,0.25);
+    border-radius: 4px;
+    color: var(--accent);
+    font-family: 'Orbitron', monospace;
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    padding: 0 8px;
+  }
+
+  input[type=number]:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 10px rgba(0,229,255,0.3);
+  }
+
+  input[type=number].angle-input {
+    border-color: rgba(255,107,53,0.25);
+    color: var(--accent2);
+  }
+
+  input[type=number].angle-input:focus {
+    border-color: var(--accent2);
+    box-shadow: 0 0 10px rgba(255,107,53,0.3);
+  }
+
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+  .input-unit {
+    font-size: 0.6rem;
+    color: var(--muted);
+    white-space: nowrap;
+    min-width: 28px;
+    text-align: left;
+  }
+
+  .input-hint {
+    font-size: 0.55rem;
+    color: rgba(0,229,255,0.4);
+    text-align: right;
+  }
+
+  .input-error {
+    font-size: 0.55rem;
+    color: var(--fail);
+    min-height: 14px;
+  }
+
+  /* Target Info Panel */
+  .target-info-panel {
+    background: var(--surface2);
+    border: 1px solid rgba(255,107,53,0.2);
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .target-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.62rem;
+  }
+
+  .target-info-label { color: var(--muted); }
+  .target-info-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--accent2);
+  }
+
+  .target-info-val.grav-val { color: var(--accent); }
+
+  /* Inline feedback pill */
+  .throw-feedback-pill {
+    display: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-align: center;
+    border: 1px solid;
+  }
+  .throw-feedback-pill.short { background: rgba(255,107,53,0.12); border-color: rgba(255,107,53,0.4); color: var(--accent2); }
+  .throw-feedback-pill.long  { background: rgba(0,229,255,0.08); border-color: rgba(0,229,255,0.3); color: var(--accent); }
+  .throw-feedback-pill.high  { background: rgba(127,255,0,0.08); border-color: rgba(127,255,0,0.3); color: var(--accent3); }
+  .throw-feedback-pill.low   { background: rgba(255,51,102,0.1); border-color: rgba(255,51,102,0.3); color: var(--fail); }
+  .throw-feedback-pill.hit   { background: rgba(0,255,136,0.1); border-color: rgba(0,255,136,0.4); color: var(--success); }
+  .throw-feedback-pill.visible { display: block; }
+
+  /* Gravity display */
+  .gravity-display {
+    background: var(--surface2);
+    border: 1px solid rgba(0,229,255,0.15);
+    border-radius: 6px;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .gravity-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.6rem;
+    color: var(--accent);
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .gravity-unit {
+    font-size: 0.55rem;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .gravity-name {
+    font-size: 0.7rem;
+    color: var(--text);
+    margin-top: 4px;
+    font-weight: 700;
+  }
+
+  /* Custom gravity */
+  .custom-gravity-section { display: none; }
+  .custom-gravity-section.visible { display: block; }
+
+  /* Action buttons */
+  .btn {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    padding: 10px 16px;
+    border: none;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    width: 100%;
+  }
+
+  .btn-throw {
+    background: linear-gradient(135deg, var(--accent), #0080ff);
+    color: var(--bg);
+    font-weight: 700;
+    box-shadow: var(--glow);
+  }
+  .btn-throw:hover { filter: brightness(1.2); transform: translateY(-1px); }
+  .btn-throw:active { transform: translateY(0); }
+  .btn-throw:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .btn-reset {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .btn-reset:hover { color: var(--text); border-color: var(--text); }
+
+  /* Stats */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .stat-box {
+    background: var(--surface2);
+    border: 1px solid rgba(0,229,255,0.1);
+    border-radius: 4px;
+    padding: 8px;
+    text-align: center;
+  }
+
+  .stat-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.85rem;
+    color: var(--accent3);
+    font-weight: 700;
+  }
+
+  .stat-lbl {
+    font-size: 0.5rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  /* ===== CANVAS AREA ===== */
+  .canvas-area {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Objective bar */
+  .objective-bar {
+    background: rgba(0,229,255,0.05);
+    border-bottom: 1px solid rgba(0,229,255,0.1);
+    padding: 8px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 0.65rem;
+  }
+
+  .obj-label {
+    color: var(--accent);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
+
+  .obj-text { color: var(--text); flex: 1; }
+
+  .attempts-badge {
+    background: var(--surface2);
+    border: 1px solid rgba(255,107,53,0.3);
+    color: var(--accent2);
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 0.6rem;
+    white-space: nowrap;
+  }
+
+  canvas {
+    flex: 1;
+    display: block;
+    background: transparent;
+    cursor: crosshair;
+  }
+
+  /* ===== FEEDBACK OVERLAY ===== */
+  .feedback-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(5,10,18,0.85);
+    z-index: 50;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    backdrop-filter: blur(4px);
+  }
+
+  .feedback-overlay.visible {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .feedback-card {
+    background: var(--surface);
+    border: 1px solid rgba(0,229,255,0.2);
+    border-radius: 12px;
+    padding: 32px;
+    max-width: 480px;
+    width: 90%;
+    text-align: center;
+    position: relative;
+    box-shadow: 0 0 60px rgba(0,229,255,0.1);
+  }
+
+  .feedback-card.success { border-color: var(--success); box-shadow: 0 0 60px rgba(0,255,136,0.1); }
+  .feedback-card.fail { border-color: var(--fail); box-shadow: 0 0 60px rgba(255,51,102,0.1); }
+
+  .feedback-icon { font-size: 3rem; margin-bottom: 12px; }
+
+  .feedback-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.4rem;
+    font-weight: 900;
+    margin-bottom: 8px;
+  }
+  .success .feedback-title { color: var(--success); }
+  .fail .feedback-title { color: var(--fail); }
+
+  .feedback-msg { font-size: 0.7rem; color: var(--muted); line-height: 1.6; margin-bottom: 16px; }
+
+  .physics-fact {
+    background: rgba(0,229,255,0.05);
+    border: 1px solid rgba(0,229,255,0.15);
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 0.65rem;
+    color: var(--accent);
+    margin-bottom: 16px;
+    line-height: 1.6;
+    text-align: left;
+  }
+
+  .physics-fact strong { color: var(--text); }
+
+  .feedback-btns { display: flex; gap: 8px; }
+
+  .btn-sm {
+    flex: 1;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.6rem;
+    padding: 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    transition: all 0.2s;
+  }
+
+  .btn-retry {
+    background: rgba(255,51,102,0.15);
+    color: var(--fail);
+    border: 1px solid rgba(255,51,102,0.3);
+  }
+  .btn-retry:hover { background: rgba(255,51,102,0.25); }
+
+  .btn-next {
+    background: linear-gradient(135deg, var(--success), #00cc66);
+    color: var(--bg);
+    font-weight: 700;
+  }
+  .btn-next:hover { filter: brightness(1.15); }
+
+  /* ===== TRAJECTORY TOOLTIP ===== */
+  .trajectory-info {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    font-size: 0.55rem;
+    color: var(--muted);
+    background: rgba(5,10,18,0.7);
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid rgba(0,229,255,0.1);
+    pointer-events: none;
+  }
+
+  /* Intro screen */
+  .intro-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 24px;
+    text-align: center;
+    padding: 20px;
+    transition: opacity 0.5s;
+  }
+
+  .intro-screen.hidden { opacity: 0; pointer-events: none; }
+
+  .intro-logo {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(2rem, 6vw, 4rem);
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--accent), var(--accent2), var(--accent3));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(0 0 30px rgba(0,229,255,0.5));
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { filter: drop-shadow(0 0 20px rgba(0,229,255,0.4)); }
+    50% { filter: drop-shadow(0 0 40px rgba(0,229,255,0.8)); }
+  }
+
+  .intro-subtitle {
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+  }
+
+  .intro-desc {
+    max-width: 500px;
+    font-size: 0.8rem;
+    color: var(--text);
+    line-height: 2;
+    opacity: 0.8;
+  }
+
+  .intro-formula {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.75rem;
+    color: var(--accent);
+    background: var(--surface);
+    border: 1px solid rgba(0,229,255,0.2);
+    padding: 12px 24px;
+    border-radius: 8px;
+    letter-spacing: 0.05em;
+  }
+
+  .btn-start {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.9rem;
+    font-weight: 700;
+    padding: 16px 48px;
+    background: linear-gradient(135deg, var(--accent), #0080ff);
+    color: var(--bg);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    box-shadow: var(--glow);
+    transition: all 0.2s;
+    animation: bounce 1s ease-in-out infinite alternate;
+  }
+
+  @keyframes bounce {
+    from { transform: translateY(0); box-shadow: 0 0 20px rgba(0,229,255,0.4); }
+    to { transform: translateY(-4px); box-shadow: 0 0 40px rgba(0,229,255,0.7); }
+  }
+
+  .btn-start:hover { filter: brightness(1.15); }
+
+  /* Particles for success */
+  .particle {
+    position: absolute;
+    pointer-events: none;
+    border-radius: 50%;
+    animation: particle-fly 1s ease-out forwards;
+  }
+
+  @keyframes particle-fly {
+    from { opacity: 1; transform: translate(0, 0) scale(1); }
+    to { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0); }
+  }
+
+  /* Responsive */
+  @media (max-width: 700px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; height: auto; }
+    .sidebar { order: 2; max-height: 300px; }
+    canvas { min-height: 300px; }
+    .canvas-area { order: 1; }
+  }
+</style>
+</head>
+<body>
+
+<!-- INTRO SCREEN -->
+<div class="intro-screen" id="introScreen">
+  <div class="intro-logo">⚡ GRAVITY THROW LAB</div>
+  <div class="intro-subtitle">Learn Physics by Playing with Gravity</div>
+  <div class="intro-desc">
+    Throw a ball across different planetary environments.<br>
+    Master <strong>angle</strong> and <strong>force</strong> to hit the target.<br>
+    Discover how gravity shapes every trajectory.
+  </div>
+  <div class="intro-formula">
+    x = v·cos(θ)·t &nbsp;|&nbsp; y = <strong>h</strong> + v·sin(θ)·t − ½g·t²
+  </div>
+  <button class="btn-start" onclick="startGame()">LAUNCH EXPERIMENT →</button>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">⚡ GRAVITY THROW LAB</div>
+  <div class="motto">Learn Physics by Playing with Gravity</div>
+</header>
+
+<!-- MAIN APP -->
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- Level Select -->
+    <div>
+      <div class="panel-title">Mission Select</div>
+      <div class="level-grid" id="levelGrid"></div>
+    </div>
+
+    <!-- Gravity Display -->
+    <div>
+      <div class="panel-title">Gravity Field</div>
+      <div class="gravity-display">
+        <div class="gravity-val" id="gravVal">9.8</div>
+        <div class="gravity-unit">m/s²</div>
+        <div class="gravity-name" id="gravName">🌍 Earth</div>
+      </div>
+    </div>
+
+    <!-- Custom Gravity -->
+    <div class="custom-gravity-section" id="customGravSection">
+      <div class="panel-title">Custom Gravity</div>
+      <div class="control-group">
+        <div class="control-label"><span>Gravity (m/s²)</span></div>
+        <div class="num-input-wrap">
+          <input type="number" min="0.1" max="50" step="0.1" value="9.8" id="customGravInput">
+          <span class="input-unit">m/s²</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Target Info -->
+    <div>
+      <div class="panel-title">Target Info</div>
+      <div class="target-info-panel">
+        <div class="target-info-row" id="launchHRow">
+          <span class="target-info-label">Launch Height</span>
+          <span class="target-info-val" id="infoLaunchH" style="color:var(--accent3)">—</span>
+        </div>
+        <div class="target-info-row">
+          <span class="target-info-label">Horizontal Distance</span>
+          <span class="target-info-val" id="infoDistance">—</span>
+        </div>
+        <div class="target-info-row">
+          <span class="target-info-label">Target Height</span>
+          <span class="target-info-val" id="infoHeight">—</span>
+        </div>
+        <div class="target-info-row">
+          <span class="target-info-label">Gravity</span>
+          <span class="target-info-val grav-val" id="infoGravity">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Throw Controls -->
+    <div>
+      <div class="panel-title">Throw Controls</div>
+      <div class="control-group">
+        <div class="control-label">
+          <span>Initial Velocity</span>
+          <span class="input-hint">v₀ (m/s)</span>
+        </div>
+        <div class="num-input-wrap">
+          <input type="number" min="1" max="200" step="0.5" value="30" id="velocityInput" placeholder="m/s">
+          <span class="input-unit">m/s</span>
+        </div>
+        <div class="input-error" id="velocityError"></div>
+      </div>
+      <br>
+      <div class="control-group">
+        <div class="control-label">
+          <span>Launch Angle</span>
+          <span class="input-hint">θ (degrees)</span>
+        </div>
+        <div class="num-input-wrap">
+          <input type="number" min="1" max="89" step="0.5" value="45" id="angleInput" class="angle-input" placeholder="°">
+          <span class="input-unit">deg</span>
+        </div>
+        <div class="input-error" id="angleError"></div>
+      </div>
+    </div>
+
+    <!-- Throw Feedback Pill -->
+    <div class="throw-feedback-pill" id="throwFeedbackPill"></div>
+
+    <!-- Action Buttons -->
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button class="btn btn-throw" id="throwBtn" onclick="throwBall()">▶ THROW</button>
+      <button class="btn btn-reset" onclick="resetBall()">↺ RESET</button>
+    </div>
+
+    <!-- Stats -->
+    <div>
+      <div class="panel-title">Flight Data</div>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-val" id="statRange">—</div>
+          <div class="stat-lbl">Range (m)</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" id="statHeight">—</div>
+          <div class="stat-lbl">Max Height</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" id="statTime">—</div>
+          <div class="stat-lbl">Flight Time</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" id="statVelo">—</div>
+          <div class="stat-lbl">Init. Vel.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CANVAS AREA -->
+  <div class="canvas-area">
+    <div class="objective-bar">
+      <span class="obj-label">OBJECTIVE:</span>
+      <span class="obj-text" id="objText">Hit the target to complete the mission.</span>
+      <span class="attempts-badge" id="attemptsBadge">THROWS: 0</span>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+    <div class="trajectory-info" id="trajectoryInfo">Enter velocity & angle, then THROW to see trajectory</div>
+
+    <!-- Feedback Overlay -->
+    <div class="feedback-overlay" id="feedbackOverlay">
+      <div class="feedback-card" id="feedbackCard">
+        <div class="feedback-icon" id="feedbackIcon"></div>
+        <div class="feedback-title" id="feedbackTitle"></div>
+        <div class="feedback-msg" id="feedbackMsg"></div>
+        <div class="physics-fact" id="physicsFact"></div>
+        <div class="feedback-btns">
+          <button class="btn-sm btn-retry" onclick="closeFeedback()">↺ RETRY</button>
+          <button class="btn-sm btn-next" id="nextBtn" onclick="nextLevel()">NEXT LEVEL →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// GAME DATA
+// ============================================================
+const LEVELS = [
+  {
+    id: 1, name: 'Earth', icon: '🌍',
+    gravity: 9.8,
+    launchHeight: 0,   // meters above ground — player stands here
+    targetDist: 0.45,
+    targetY: 0,        // meters above ground (0 = on ground)
+    radius: 28,
+    objective: 'Earth gravity (g = 9.8 m/s²). Launch height = 0 m. Hit the ground target.',
+    successFact: '🌍 <strong>Earth\'s gravity</strong> is 9.8 m/s². At 45° you achieve maximum range. The parabolic trajectory results from constant gravitational acceleration acting downward.',
+    failFact: '💡 Hint: For a ground target, use Range = v²·sin(2θ)/g. Try θ = 45° for maximum range, then adjust velocity accordingly.',
+  },
+  {
+    id: 2, name: 'Moon', icon: '🌑',
+    gravity: 1.62,
+    launchHeight: 0,
+    targetDist: 0.62,
+    targetY: 0,
+    radius: 28,
+    objective: 'Moon gravity (g = 1.62 m/s²). Launch height = 0 m. Much weaker pull — the ball travels FAR. Recalculate!',
+    successFact: '🌑 <strong>Moon\'s gravity</strong> is 1/6 of Earth\'s. Lower g means longer flight time, so the same launch sends the ball ~6× farther!',
+    failFact: '💡 Hint: Lower gravity → longer flight → farther range. Use Range = v²·sin(2θ)/g with g = 1.62 to find the right velocity.',
+  },
+  {
+    id: 3, name: 'Mars', icon: '🔴',
+    gravity: 3.72,
+    launchHeight: 0,
+    targetDist: 0.50,
+    targetY: 15,
+    radius: 26,
+    objective: 'Mars gravity (g = 3.72 m/s²). Launch height = 0 m. Target is 15 m high — hit it mid-air!',
+    successFact: '🔴 <strong>Mars gravity</strong> (3.72 m/s²) is 38% of Earth\'s. Hitting a mid-air target requires solving for both x and y simultaneously — real rocket science!',
+    failFact: '💡 Hint: For a mid-air target at height h, solve: h = v·sin(θ)·t − ½g·t² and x = v·cos(θ)·t simultaneously.',
+  },
+  {
+    id: 4, name: 'Heavy Planet', icon: '🪐',
+    gravity: 24.8,
+    launchHeight: 0,
+    targetDist: 0.33,
+    targetY: 20,
+    radius: 26,
+    objective: 'Jupiter gravity (g = 24.8 m/s²)! Launch height = 0 m. Target floats 20 m high. Steep angle + high velocity!',
+    successFact: '🪐 <strong>Jupiter-like gravity</strong> (24.8 m/s²) is 2.5× Earth\'s. High g crushes flight time — you must launch harder and steeper to reach elevated targets.',
+    failFact: '💡 Hint: High gravity means the ball drops fast. Aim steep (60–75°) with high velocity to reach the elevated target before gravity pulls it down.',
+  },
+  {
+    id: 5, name: 'Custom', icon: '⚗️',
+    gravity: 9.8,
+    launchHeight: 0,
+    targetDist: 0.50,
+    targetY: 10,
+    radius: 26,
+    objective: 'Custom gravity mode! Launch height = 0 m. Target is 10 m above ground. Experiment and calculate!',
+    successFact: '⚗️ <strong>Experiment complete!</strong> You can now see how changing g reshapes the entire parabola — lower g = wider arc, higher g = tighter drop.',
+    failFact: '💡 Adjust the custom gravity value and recalculate. Remember: t_land = 2v·sin(θ)/g and range changes with 1/g.',
+  },
+  // ── ELEVATED LAUNCH LEVELS (launch from 100 m building) ──
+  {
+    id: 6, name: 'Rooftop', icon: '🏢',
+    gravity: 9.8,
+    launchHeight: 100, // player stands 100 m above ground on building
+    targetDist: 0.55,
+    targetY: 0,        // target ON the ground
+    radius: 22,        // smaller target — harder!
+    objective: 'ADVANCED: Launch from 100 m building on Earth! y = h + v·sin(θ)·t − ½g·t². Target is on the ground.',
+    successFact: '🏢 <strong>Elevated launch</strong> changes everything! With h = 100 m, the ball has extra height to gain horizontal range. Time of flight is longer: solve 0 = 100 + v·sin(θ)·t − ½g·t² for t.',
+    failFact: '💡 Hint: y(t) = 100 + v·sin(θ)·t − ½·9.8·t². Set y = 0 and solve for t (use quadratic formula). Then x = v·cos(θ)·t gives the range.',
+  },
+  {
+    id: 7, name: 'Sky Strike', icon: '🌤️',
+    gravity: 3.72,
+    launchHeight: 100, // 100 m building on Mars
+    targetDist: 0.60,
+    targetY: 30,       // floating target 30 m above ground
+    radius: 20,        // even smaller
+    objective: 'ADVANCED: 100 m building on Mars (g = 3.72)! Target floats 30 m above ground. Solve for x and y together.',
+    successFact: '🌤️ <strong>Sky strike!</strong> You launched from 100 m and hit a floating target at 30 m. With h₀ = 100 and h_target = 30, the net height drop is 70 m during flight.',
+    failFact: '💡 Hint: y(t) = 100 + v·sin(θ)·t − ½·3.72·t² = 30. Rearrange: v·sin(θ)·t − 1.86t² = −70. Also x = v·cos(θ)·t = target distance.',
+  },
+  {
+    id: 8, name: 'Apex Shot', icon: '🎯',
+    gravity: 12.0,
+    launchHeight: 100, // 100 m building, high gravity
+    targetDist: 0.40,
+    targetY: 50,       // target 50 m above ground (above midpoint!)
+    radius: 18,        // smallest — expert level
+    objective: 'EXPERT: 100 m building, g = 12 m/s². Hit target floating at 50 m above ground. Smallest target yet!',
+    successFact: '🎯 <strong>Expert cleared!</strong> Launching from 100 m and hitting a 50 m target means the ball only falls 50 m net. With high g, you need precise angle to time the arc correctly.',
+    failFact: '💡 Hint: y(t) = 100 + v·sin(θ)·t − 6t² = 50, so v·sin(θ)·t − 6t² = −50. And x = v·cos(θ)·t = target distance. Solve simultaneously.',
+  },
+];
+
+// ============================================================
+// STATE
+// ============================================================
+let state = {
+  currentLevel: 0,
+  completedLevels: JSON.parse(localStorage.getItem('gtl_completed') || '[]'),
+  attempts: 0,
+  isAnimating: false,
+  ball: null,
+  gravity: 9.8,
+  velocity: 30,   // m/s — direct input
+  angle: 45,      // degrees
+  lastThrowPoints: null,  // store trail after throw
+};
+
+// ============================================================
+// CANVAS SETUP
+// ============================================================
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  const area = canvas.parentElement;
+  canvas.width = area.clientWidth;
+  canvas.height = area.clientHeight - 40; // minus objective bar
+}
+
+window.addEventListener('resize', () => { resizeCanvas(); updateTargetInfoPanel(); drawScene(); });
+
+// ============================================================
+// PHYSICS (SCALE: 1 pixel = 0.5 meters)
+// ============================================================
+const SCALE = 0.5; // m per pixel
+const GROUND_OFFSET = 60; // px from bottom
+// Building visual constants
+const BUILDING_WIDTH = 60;   // px wide
+const BUILDING_PX_PER_METER = 1 / SCALE; // same as general scale
+
+function getGroundY() { return canvas.height - GROUND_OFFSET; }
+function getCharX() { return 80; }  // slightly further right to accommodate building
+
+// Launch height in meters → pixel offset above ground
+function getLaunchHeightPx() {
+  const level = LEVELS[state.currentLevel];
+  return (level.launchHeight || 0) / SCALE;
+}
+
+// Y-pixel where the character stands (top of building, or ground)
+function getLaunchY() {
+  return getGroundY() - getLaunchHeightPx();
+}
+
+function getTargetX() {
+  const level = LEVELS[state.currentLevel];
+  return Math.round(getCharX() + level.targetDist * (canvas.width - 140));
+}
+function getTargetY() {
+  const level = LEVELS[state.currentLevel];
+  return getGroundY() - (level.targetY / SCALE);
+}
+function getTargetYMeters() {
+  return LEVELS[state.currentLevel].targetY;
+}
+function getTargetDistMeters() {
+  const level = LEVELS[state.currentLevel];
+  return Math.round(level.targetDist * (canvas.width - 140) * SCALE);
+}
+function getLaunchHeightMeters() {
+  return LEVELS[state.currentLevel].launchHeight || 0;
+}
+
+// Physics simulation — uses direct velocity (m/s) and launch height
+// x(t) = v*cos(θ)*t
+// y(t) = h + v*sin(θ)*t - 0.5*g*t²   (h = launch height above ground)
+
+function simulateTrajectory(velocity, angleDeg, gravity, steps = 1200) {
+  const v = velocity;
+  const h0 = getLaunchHeightMeters(); // launch height in meters
+  const theta = angleDeg * Math.PI / 180;
+  const vx = v * Math.cos(theta);
+  const vy = v * Math.sin(theta);
+  const dt = 0.03;
+
+  const charX = getCharX();
+  const groundY = getGroundY();
+  const launchY = getLaunchY();  // pixel Y where ball starts
+  const pxPerMeter = 1 / SCALE;
+
+  const points = [];
+  let t = 0;
+  let maxY = h0; // max height in meters (starts at launch height)
+  let flightTime = 0;
+
+  for (let i = 0; i < steps; i++) {
+    const xM = vx * t;
+    const yM = h0 + vy * t - 0.5 * gravity * t * t; // height above ground in meters
+    const pxX = charX + xM * pxPerMeter;
+    const pxY = groundY - yM * pxPerMeter; // canvas Y
+
+    if (yM > maxY) maxY = yM;
+
+    // Ball hits the ground (y=0 in meters)
+    if (yM < 0 && i > 0) {
+      const prevT = t - dt;
+      const prevYM = h0 + vy * prevT - 0.5 * gravity * prevT * prevT;
+      // Interpolate exact landing time
+      flightTime = prevT + prevYM / (prevYM - yM) * dt;
+      const landX = vx * flightTime;
+      points.push({ x: charX + landX * pxPerMeter, y: groundY });
+      break;
+    }
+
+    points.push({ x: pxX, y: pxY });
+    t += dt;
+  }
+
+  flightTime = flightTime || t;
+  const range = vx * flightTime;
+
+  return { points, maxHeight: maxY, flightTime, range, landX: points[points.length - 1]?.x };
+}
+
+// ============================================================
+// DRAWING
+// ============================================================
+function drawScene(ballPos = null, trailPoints = null) {
+  if (canvas.width === 0) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  drawBackground();
+  drawGround();
+  drawBuilding();   // draw building before character (behind it)
+  drawTarget();
+  drawCharacter();
+  if (trailPoints) drawTrail(trailPoints);
+  else if (state.lastThrowPoints && !state.isAnimating) drawTrail(state.lastThrowPoints);
+  if (ballPos) drawBall(ballPos.x, ballPos.y);
+}
+
+function drawBackground() {
+  // Space gradient
+  const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  grad.addColorStop(0, '#050a12');
+  grad.addColorStop(0.7, '#080f20');
+  grad.addColorStop(1, '#0a1628');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Stars
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  const starSeed = [
+    [0.1,0.05],[0.25,0.12],[0.4,0.03],[0.55,0.18],[0.7,0.08],
+    [0.85,0.15],[0.15,0.25],[0.6,0.3],[0.9,0.05],[0.35,0.35],
+    [0.8,0.4],[0.05,0.4],[0.5,0.45],[0.2,0.5],[0.75,0.2],
+  ];
+  starSeed.forEach(([fx,fy]) => {
+    ctx.beginPath();
+    ctx.arc(fx * canvas.width, fy * canvas.height, 1, 0, Math.PI*2);
+    ctx.fill();
+  });
+
+  // Level name in background
+  const level = LEVELS[state.currentLevel];
+  ctx.font = `bold ${Math.min(canvas.height * 0.3, 150)}px Orbitron, monospace`;
+  ctx.fillStyle = 'rgba(0,229,255,0.03)';
+  ctx.textAlign = 'right';
+  ctx.fillText(level.name.toUpperCase(), canvas.width - 20, canvas.height * 0.6);
+  ctx.textAlign = 'left';
+}
+
+function drawGround() {
+  const gy = getGroundY();
+
+  // Ground line glow
+  ctx.shadowColor = 'rgba(0,229,255,0.5)';
+  ctx.shadowBlur = 10;
+  ctx.strokeStyle = 'rgba(0,229,255,0.4)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, gy);
+  ctx.lineTo(canvas.width, gy);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Ground gradient
+  const gg = ctx.createLinearGradient(0, gy, 0, canvas.height);
+  gg.addColorStop(0, 'rgba(0,229,255,0.08)');
+  gg.addColorStop(1, 'rgba(0,229,255,0.02)');
+  ctx.fillStyle = gg;
+  ctx.fillRect(0, gy, canvas.width, canvas.height - gy);
+
+  // Distance markers
+  ctx.strokeStyle = 'rgba(0,229,255,0.15)';
+  ctx.lineWidth = 1;
+  ctx.font = '9px Space Mono, monospace';
+  ctx.fillStyle = 'rgba(0,229,255,0.3)';
+  const charX = getCharX();
+  const interval = 100; // pixels
+  for (let px = charX; px < canvas.width; px += interval) {
+    const dist = Math.round((px - charX) * SCALE);
+    ctx.beginPath();
+    ctx.moveTo(px, gy);
+    ctx.lineTo(px, gy + 6);
+    ctx.stroke();
+    ctx.fillText(dist + 'm', px - 8, gy + 18);
+  }
+}
+
+// ── BUILDING ──
+function drawBuilding() {
+  const level = LEVELS[state.currentLevel];
+  const h = level.launchHeight || 0;
+  if (h <= 0) return; // no building for ground-level launches
+
+  const cx = getCharX();
+  const groundY = getGroundY();
+  const buildingHeightPx = h / SCALE;
+  const bw = BUILDING_WIDTH;
+  const bx = cx - bw / 2;
+  const byTop = groundY - buildingHeightPx;
+
+  // Building body — gradient for depth
+  const bgrad = ctx.createLinearGradient(bx, byTop, bx + bw, byTop);
+  bgrad.addColorStop(0, 'rgba(0,180,220,0.25)');
+  bgrad.addColorStop(0.5, 'rgba(0,229,255,0.15)');
+  bgrad.addColorStop(1, 'rgba(0,100,160,0.2)');
+  ctx.fillStyle = bgrad;
+  ctx.fillRect(bx, byTop, bw, buildingHeightPx);
+
+  // Building border
+  ctx.strokeStyle = 'rgba(0,229,255,0.6)';
+  ctx.lineWidth = 1.5;
+  ctx.shadowColor = 'rgba(0,229,255,0.4)';
+  ctx.shadowBlur = 8;
+  ctx.strokeRect(bx, byTop, bw, buildingHeightPx);
+  ctx.shadowBlur = 0;
+
+  // Window grid
+  const winCols = 3, winRows = Math.max(2, Math.floor(buildingHeightPx / 18));
+  const winW = 8, winH = 7;
+  const colSpacing = bw / (winCols + 1);
+  const rowSpacing = buildingHeightPx / (winRows + 1);
+  for (let r = 1; r <= winRows; r++) {
+    for (let c = 1; c <= winCols; c++) {
+      const wx = bx + c * colSpacing - winW / 2;
+      const wy = byTop + r * rowSpacing - winH / 2;
+      const lit = (r + c) % 3 !== 0; // some windows lit
+      ctx.fillStyle = lit ? 'rgba(0,229,255,0.35)' : 'rgba(0,229,255,0.05)';
+      ctx.strokeStyle = 'rgba(0,229,255,0.3)';
+      ctx.lineWidth = 0.5;
+      ctx.fillRect(wx, wy, winW, winH);
+      ctx.strokeRect(wx, wy, winW, winH);
+    }
+  }
+
+  // Rooftop platform line
+  ctx.strokeStyle = 'rgba(0,229,255,0.9)';
+  ctx.lineWidth = 2.5;
+  ctx.shadowColor = 'rgba(0,229,255,0.7)';
+  ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.moveTo(bx - 6, byTop);
+  ctx.lineTo(bx + bw + 6, byTop);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Height label on building
+  ctx.fillStyle = 'rgba(0,229,255,0.7)';
+  ctx.font = 'bold 9px Space Mono';
+  ctx.textAlign = 'center';
+  ctx.fillText(`${h}m`, cx, byTop + buildingHeightPx / 2 + 4);
+  ctx.textAlign = 'left';
+
+  // Height arrow annotation (left side of building)
+  const arrowX = bx - 14;
+  ctx.strokeStyle = 'rgba(127,255,0,0.5)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(arrowX, groundY);
+  ctx.lineTo(arrowX, byTop);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // Arrow heads
+  ctx.fillStyle = 'rgba(127,255,0,0.7)';
+  ctx.beginPath();
+  ctx.moveTo(arrowX, byTop);
+  ctx.lineTo(arrowX - 4, byTop + 8);
+  ctx.lineTo(arrowX + 4, byTop + 8);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(arrowX, groundY);
+  ctx.lineTo(arrowX - 4, groundY - 8);
+  ctx.lineTo(arrowX + 4, groundY - 8);
+  ctx.fill();
+
+  // "LAUNCH h=100m" label
+  ctx.fillStyle = 'rgba(127,255,0,0.85)';
+  ctx.font = 'bold 8px Orbitron, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(`h=${h}m`, arrowX, (groundY + byTop) / 2 + 4);
+  ctx.textAlign = 'left';
+}
+
+function drawCharacter() {
+  const cx = getCharX();
+  const launchY = getLaunchY();  // stand on top of building (or ground)
+  const scale = Math.min(canvas.height / 500, 1.2);
+  const h = 50 * scale;
+
+  ctx.fillStyle = '#00e5ff';
+  ctx.shadowColor = 'rgba(0,229,255,0.6)';
+  ctx.shadowBlur = 12;
+  ctx.beginPath();
+  ctx.arc(cx, launchY - h, 8 * scale, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillRect(cx - 5 * scale, launchY - h + 9 * scale, 10 * scale, 20 * scale);
+  ctx.fillRect(cx - 5 * scale, launchY - h + 29 * scale, 4 * scale, 14 * scale);
+  ctx.fillRect(cx + 1 * scale, launchY - h + 29 * scale, 4 * scale, 14 * scale);
+
+  // Throw arm direction
+  const angleRad = state.angle * Math.PI / 180;
+  const armLen = 18 * scale;
+  const armEndX = cx + Math.cos(angleRad) * armLen;
+  const armEndY = (launchY - h + 15 * scale) - Math.sin(angleRad) * armLen;
+  ctx.strokeStyle = '#00e5ff';
+  ctx.lineWidth = 3 * scale;
+  ctx.beginPath();
+  ctx.moveTo(cx, launchY - h + 15 * scale);
+  ctx.lineTo(armEndX, armEndY);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Angle arc indicator
+  ctx.strokeStyle = 'rgba(255,107,53,0.5)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(cx, launchY - h + 15 * scale, 22 * scale, -Math.PI / 2, -(state.angle * Math.PI / 180), true);
+  ctx.stroke();
+
+  // Angle label
+  ctx.fillStyle = 'rgba(255,107,53,0.9)';
+  ctx.font = `bold ${10 * scale}px Space Mono`;
+  ctx.fillText(`${state.angle}°`, cx + 20, launchY - h - 4);
+}
+
+function drawTarget() {
+  const tx = getTargetX();
+  const ty = getTargetY();
+  const gy = getGroundY();
+  const r = LEVELS[state.currentLevel].radius;
+  const t = Date.now() / 1000;
+  const isMidAir = LEVELS[state.currentLevel].targetY > 0;
+
+  // Pole from ground up to target center
+  ctx.strokeStyle = 'rgba(255,107,53,0.5)';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  ctx.moveTo(tx, gy);
+  ctx.lineTo(tx, ty);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Pulsing rings — full circle for mid-air, semicircle for ground
+  for (let i = 3; i >= 0; i--) {
+    const pulse = i === 0 ? (Math.sin(t * 3) * 0.2 + 0.8) : 1;
+    const ringR = r * (1 + i * 0.4);
+    ctx.strokeStyle = `rgba(255,107,53,${(0.6 - i * 0.15) * pulse})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(tx, ty, ringR, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Target body — full circle
+  ctx.fillStyle = 'rgba(255,107,53,0.12)';
+  ctx.strokeStyle = '#ff6b35';
+  ctx.lineWidth = 2;
+  ctx.shadowColor = 'rgba(255,107,53,0.6)';
+  ctx.shadowBlur = 15;
+  ctx.beginPath();
+  ctx.arc(tx, ty, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Bullseye center
+  ctx.fillStyle = '#ff6b35';
+  ctx.beginPath();
+  ctx.arc(tx, ty, r * 0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // "TARGET" label above
+  ctx.fillStyle = 'rgba(255,107,53,0.9)';
+  ctx.font = 'bold 9px Orbitron, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('TARGET', tx, ty - r - 8);
+
+  // Height annotation if mid-air
+  if (isMidAir) {
+    const hMeters = LEVELS[state.currentLevel].targetY;
+    // Draw height arrow on right side of pole
+    ctx.strokeStyle = 'rgba(127,255,0,0.5)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(tx + r + 10, gy);
+    ctx.lineTo(tx + r + 10, ty);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Arrow heads
+    ctx.fillStyle = 'rgba(127,255,0,0.7)';
+    ctx.beginPath();
+    ctx.moveTo(tx + r + 10, ty);
+    ctx.lineTo(tx + r + 6, ty + 8);
+    ctx.lineTo(tx + r + 14, ty + 8);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(tx + r + 10, gy);
+    ctx.lineTo(tx + r + 6, gy - 8);
+    ctx.lineTo(tx + r + 14, gy - 8);
+    ctx.fill();
+    // Label
+    ctx.fillStyle = 'rgba(127,255,0,0.9)';
+    ctx.font = 'bold 9px Space Mono';
+    ctx.textAlign = 'left';
+    ctx.fillText(`h=${hMeters}m`, tx + r + 16, (gy + ty) / 2 + 4);
+  }
+
+  // Horizontal distance annotation (dashed line from char base to target base, along ground or launch level)
+  const charX = getCharX();
+  const distMeters = getTargetDistMeters();
+  const annotY = getGroundY() + 28;
+  ctx.strokeStyle = 'rgba(0,229,255,0.2)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 6]);
+  ctx.beginPath();
+  ctx.moveTo(charX, annotY);
+  ctx.lineTo(tx, annotY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(0,229,255,0.6)';
+  ctx.font = 'bold 9px Space Mono';
+  ctx.textAlign = 'center';
+  ctx.fillText(`← ${distMeters} m →`, (charX + tx) / 2, annotY + 14);
+  ctx.textAlign = 'left';
+}
+
+// Preview trajectory removed — trajectory only shown after throw
+
+function drawTrail(points) {
+  if (points.length < 2) return;
+  ctx.strokeStyle = 'rgba(0,229,255,0.3)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([3, 5]);
+  ctx.beginPath();
+  points.forEach((p, i) => {
+    if (i === 0) ctx.moveTo(p.x, p.y);
+    else ctx.lineTo(p.x, p.y);
+  });
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawBall(x, y) {
+  ctx.shadowColor = 'rgba(127,255,0,0.8)';
+  ctx.shadowBlur = 20;
+  ctx.fillStyle = '#7fff00';
+  ctx.beginPath();
+  ctx.arc(x, y, 9, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.beginPath();
+  ctx.arc(x - 3, y - 3, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
+// ============================================================
+// ANIMATION
+// ============================================================
+let animFrame = null;
+
+function throwBall() {
+  if (state.isAnimating) return;
+
+  // Validate inputs
+  const velInput = document.getElementById('velocityInput');
+  const angInput = document.getElementById('angleInput');
+  const velErr = document.getElementById('velocityError');
+  const angErr = document.getElementById('angleError');
+  velErr.textContent = '';
+  angErr.textContent = '';
+
+  const v = parseFloat(velInput.value);
+  const a = parseFloat(angInput.value);
+  let valid = true;
+
+  if (isNaN(v) || v < 1 || v > 200) {
+    velErr.textContent = '⚠ Enter a value between 1–200 m/s';
+    valid = false;
+  }
+  if (isNaN(a) || a < 1 || a > 89) {
+    angErr.textContent = '⚠ Enter an angle between 1–89°';
+    valid = false;
+  }
+  if (!valid) return;
+
+  state.velocity = v;
+  state.angle = a;
+  state.isAnimating = true;
+  state.attempts++;
+  state.lastThrowPoints = null;
+  document.getElementById('throwBtn').disabled = true;
+  document.getElementById('attemptsBadge').textContent = `THROWS: ${state.attempts}`;
+  document.getElementById('throwFeedbackPill').className = 'throw-feedback-pill'; // hide
+
+  const { points, maxHeight, flightTime, range } = simulateTrajectory(state.velocity, state.angle, state.gravity);
+
+  // Update flight data stats
+  document.getElementById('statRange').textContent = range.toFixed(1) + 'm';
+  document.getElementById('statHeight').textContent = maxHeight.toFixed(1) + 'm';
+  document.getElementById('statTime').textContent = flightTime.toFixed(2) + 's';
+  document.getElementById('statVelo').textContent = state.velocity.toFixed(1) + 'm/s';
+
+  const trailPoints = [];
+  let idx = 0;
+  const totalPts = points.length;
+
+  function animate() {
+    if (idx >= totalPts) {
+      const last = points[totalPts - 1];
+      const tx = getTargetX();
+      const ty = getTargetY();
+      const level = LEVELS[state.currentLevel];
+
+      // Hit detection: check if any trajectory point passed through the target circle
+      const hit = checkHit(points, tx, ty, level.radius);
+
+      state.lastThrowPoints = trailPoints.slice();
+      drawScene(last, trailPoints);
+      state.isAnimating = false;
+      document.getElementById('throwBtn').disabled = false;
+
+      if (hit) {
+        showDirectionalFeedback('hit', 0, 0);
+        showFeedback(true, level);
+        spawnParticles(tx, ty);
+        if (!state.completedLevels.includes(state.currentLevel)) {
+          state.completedLevels.push(state.currentLevel);
+          localStorage.setItem('gtl_completed', JSON.stringify(state.completedLevels));
+          updateLevelButtons();
+        }
+      } else {
+        // Determine feedback type based on where ball landed vs target
+        const landX = last.x;
+        const landY = last.y;
+        let feedbackType = 'short';
+        let dx = (landX - tx) * SCALE;
+        let dy = (ty - landY) * SCALE; // positive = ball landed below target
+
+        if (landX < tx - level.radius) {
+          feedbackType = 'short';
+        } else if (landX > tx + level.radius) {
+          feedbackType = 'long';
+        } else if (level.targetY > 0) {
+          // Correct horizontal but wrong height
+          // Find closest Y point when ball was near target X
+          const nearestPt = findNearestXPoint(points, tx);
+          if (nearestPt && nearestPt.y > ty + level.radius) feedbackType = 'low';
+          else feedbackType = 'high';
+        }
+
+        showDirectionalFeedback(feedbackType, dx, level.targetY);
+        showFeedback(false, level, landX - tx);
+      }
+      return;
+    }
+
+    const step = Math.max(1, Math.floor(totalPts / 80));
+    for (let s = 0; s < step && idx < totalPts; s++, idx++) {
+      trailPoints.push(points[idx]);
+    }
+    drawScene(trailPoints[trailPoints.length - 1], trailPoints);
+    animFrame = requestAnimationFrame(animate);
+  }
+
+  animFrame = requestAnimationFrame(animate);
+}
+
+// Check if any point in trajectory is within the target circle
+function checkHit(points, tx, ty, radius) {
+  for (const p of points) {
+    const dist = Math.sqrt((p.x - tx) ** 2 + (p.y - ty) ** 2);
+    if (dist <= radius) return true;
+  }
+  return false;
+}
+
+// Find closest trajectory point to a given X (for height analysis)
+function findNearestXPoint(points, tx) {
+  let best = null, bestDist = Infinity;
+  for (const p of points) {
+    const d = Math.abs(p.x - tx);
+    if (d < bestDist) { bestDist = d; best = p; }
+  }
+  return best;
+}
+
+function showDirectionalFeedback(type, dxMeters, targetHeightM) {
+  const pill = document.getElementById('throwFeedbackPill');
+  const messages = {
+    hit:   '🎯 PERFECT HIT!',
+    short: `📏 TOO SHORT — ball landed before target`,
+    long:  `📏 TOO FAR — ball overshot the target`,
+    high:  `📐 TOO HIGH — ball passed above target`,
+    low:   `📐 TOO LOW — ball passed below target height`,
+  };
+  pill.textContent = messages[type] || '';
+  pill.className = `throw-feedback-pill ${type} visible`;
+}
+
+function resetBall() {
+  if (animFrame) cancelAnimationFrame(animFrame);
+  state.isAnimating = false;
+  state.lastThrowPoints = null;
+  document.getElementById('throwBtn').disabled = false;
+  document.getElementById('throwFeedbackPill').className = 'throw-feedback-pill';
+  document.getElementById('velocityError').textContent = '';
+  document.getElementById('angleError').textContent = '';
+  closeFeedback();
+  drawScene();
+}
+
+// ============================================================
+// FEEDBACK
+// ============================================================
+function showFeedback(success, level, missBy = 0) {
+  const overlay = document.getElementById('feedbackOverlay');
+  const card = document.getElementById('feedbackCard');
+  const nextBtn = document.getElementById('nextBtn');
+
+  card.className = 'feedback-card ' + (success ? 'success' : 'fail');
+  document.getElementById('feedbackIcon').textContent = success ? '🎯' : '💨';
+  document.getElementById('feedbackTitle').textContent = success ? 'TARGET HIT!' : 'MISSED!';
+
+  const h0 = level.launchHeight || 0;
+  const missM = Math.abs(Math.round(missBy * SCALE));
+  document.getElementById('feedbackMsg').textContent = success
+    ? `Excellent calculation! Hit on attempt ${state.attempts} — v₀ = ${state.velocity} m/s, θ = ${state.angle}°${h0 > 0 ? `, launch h = ${h0} m` : ''}.`
+    : `Missed by ~${missM}m. Study the trajectory trail and adjust your velocity or angle calculation.`;
+
+  document.getElementById('physicsFact').innerHTML = success ? level.successFact : level.failFact;
+  nextBtn.style.display = success && state.currentLevel < LEVELS.length - 1 ? 'block' : 'none';
+  overlay.classList.add('visible');
+}
+
+function closeFeedback() {
+  document.getElementById('feedbackOverlay').classList.remove('visible');
+}
+
+function nextLevel() {
+  closeFeedback();
+  if (state.currentLevel < LEVELS.length - 1) {
+    selectLevel(state.currentLevel + 1);
+  }
+}
+
+// ============================================================
+// PARTICLES
+// ============================================================
+function spawnParticles(x, y) {
+  const colors = ['#00e5ff', '#ff6b35', '#7fff00', '#ffffff', '#ff3366'];
+  for (let i = 0; i < 16; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const angle = (i / 16) * Math.PI * 2;
+    const dist = 40 + Math.random() * 80;
+    const dx = Math.cos(angle) * dist;
+    const dy = Math.sin(angle) * dist;
+    p.style.cssText = `
+      left: ${x + canvas.getBoundingClientRect().left + (window.scrollX || 0)}px;
+      top: ${y + canvas.getBoundingClientRect().top + (window.scrollY || 0)}px;
+      width: ${4 + Math.random() * 6}px;
+      height: ${4 + Math.random() * 6}px;
+      background: ${colors[Math.floor(Math.random() * colors.length)]};
+      --dx: ${dx}px;
+      --dy: ${dy}px;
+      position: fixed;
+      z-index: 200;
+    `;
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 1000);
+  }
+}
+
+// ============================================================
+// LEVEL MANAGEMENT
+// ============================================================
+function buildLevelButtons() {
+  const grid = document.getElementById('levelGrid');
+  grid.innerHTML = '';
+  LEVELS.forEach((level, i) => {
+    const btn = document.createElement('button');
+    const isElevated = (level.launchHeight || 0) > 0;
+    const isActive = i === state.currentLevel;
+    const isCompleted = state.completedLevels.includes(i);
+    btn.className = 'level-btn'
+      + (isElevated ? ' elevated' : '')
+      + (isActive ? ' active' : '')
+      + (isCompleted ? ' completed' : '');
+    btn.innerHTML = `<span class="level-icon">${level.icon}</span>LVL ${level.id}<br>${level.name}`;
+    btn.onclick = () => selectLevel(i);
+    grid.appendChild(btn);
+  });
+}
+
+function updateLevelButtons() {
+  const btns = document.querySelectorAll('.level-btn');
+  btns.forEach((btn, i) => {
+    const level = LEVELS[i];
+    const isElevated = (level.launchHeight || 0) > 0;
+    btn.className = 'level-btn'
+      + (isElevated ? ' elevated' : '')
+      + (i === state.currentLevel ? ' active' : '')
+      + (state.completedLevels.includes(i) ? ' completed' : '');
+  });
+}
+
+function selectLevel(idx) {
+  if (animFrame) cancelAnimationFrame(animFrame);
+  state.isAnimating = false;
+  state.currentLevel = idx;
+  state.attempts = 0;
+  state.lastThrowPoints = null;
+
+  const level = LEVELS[idx];
+  state.gravity = level.gravity;
+
+  document.getElementById('throwBtn').disabled = false;
+  document.getElementById('attemptsBadge').textContent = 'THROWS: 0';
+  document.getElementById('gravVal').textContent = level.gravity.toFixed(2);
+  document.getElementById('gravName').textContent = `${level.icon} ${level.name}`;
+  document.getElementById('objText').textContent = level.objective;
+  document.getElementById('throwFeedbackPill').className = 'throw-feedback-pill';
+
+  // Custom gravity section — only for level 5 (index 4)
+  const customSection = document.getElementById('customGravSection');
+  if (idx === 4) {
+    customSection.classList.add('visible');
+    document.getElementById('customGravInput').value = state.gravity;
+  } else {
+    customSection.classList.remove('visible');
+  }
+
+  // Reset stats
+  ['statRange','statHeight','statTime','statVelo'].forEach(id => document.getElementById(id).textContent = '—');
+  document.getElementById('velocityError').textContent = '';
+  document.getElementById('angleError').textContent = '';
+
+  // Update target info panel (needs canvas sized for pixel calculation)
+  setTimeout(updateTargetInfoPanel, 50);
+
+  closeFeedback();
+  updateLevelButtons();
+  drawScene();
+}
+
+function updateTargetInfoPanel() {
+  const level = LEVELS[state.currentLevel];
+  const distM = getTargetDistMeters();
+  document.getElementById('infoDistance').textContent = distM + ' m';
+  document.getElementById('infoHeight').textContent = level.targetY > 0 ? level.targetY + ' m' : '0 m (ground)';
+  document.getElementById('infoGravity').textContent = state.gravity.toFixed(2) + ' m/s²';
+  document.getElementById('infoLaunchH').textContent = (level.launchHeight || 0) + ' m';
+  // Show/hide the launch height row
+  document.getElementById('launchHRow').style.display = 'flex';
+}
+
+// ============================================================
+// INPUT EVENTS
+// ============================================================
+document.getElementById('velocityInput').addEventListener('input', function() {
+  const v = parseFloat(this.value);
+  if (!isNaN(v) && v >= 1 && v <= 200) {
+    state.velocity = v;
+    document.getElementById('velocityError').textContent = '';
+  }
+});
+
+document.getElementById('angleInput').addEventListener('input', function() {
+  const a = parseFloat(this.value);
+  if (!isNaN(a) && a >= 1 && a <= 89) {
+    state.angle = a;
+    document.getElementById('angleError').textContent = '';
+    drawScene(); // update arm direction only
+  }
+});
+
+document.getElementById('customGravInput').addEventListener('input', function() {
+  const g = parseFloat(this.value);
+  if (!isNaN(g) && g >= 0.1 && g <= 50) {
+    state.gravity = g;
+    document.getElementById('gravVal').textContent = g.toFixed(1);
+    updateTargetInfoPanel();
+    drawScene();
+  }
+});
+
+// Allow Enter key to throw
+document.getElementById('velocityInput').addEventListener('keydown', e => { if (e.key === 'Enter') throwBall(); });
+document.getElementById('angleInput').addEventListener('keydown', e => { if (e.key === 'Enter') throwBall(); });
+
+// ============================================================
+// RENDER LOOP (idle, 30fps — no preview needed, just for target pulse)
+// ============================================================
+let lastRenderTime = 0;
+function idleLoop(time) {
+  if (!state.isAnimating && time - lastRenderTime > 50) {
+    drawScene();
+    lastRenderTime = time;
+  }
+  requestAnimationFrame(idleLoop);
+}
+
+// ============================================================
+// INTRO / INIT
+// ============================================================
+function startGame() {
+  document.getElementById('introScreen').classList.add('hidden');
+  init();
+}
+
+function init() {
+  resizeCanvas();
+  buildLevelButtons();
+  selectLevel(0);
+  requestAnimationFrame(idleLoop);
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const visited = localStorage.getItem('gtl_visited');
+  if (visited) {
+    document.getElementById('introScreen').classList.add('hidden');
+    init();
+  } else {
+    localStorage.setItem('gtl_visited', '1');
+  }
+});
+</script>
+</body>
+</html>

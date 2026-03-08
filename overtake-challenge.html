@@ -1,0 +1,1665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Overtake Challenge – Relative Motion Game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ======================================================
+   ROOT & RESET
+   ====================================================== */
+:root {
+  --bg:       #05070f;
+  --surface:  #090d1c;
+  --surface2: #0d1328;
+  --surface3: #111a35;
+  --accent:   #c97bff;   /* purple — unique to this game */
+  --accent2:  #00e5ff;   /* cyan   */
+  --accent3:  #7fff00;   /* lime   */
+  --accent4:  #ffe135;   /* yellow */
+  --red:      #ff3355;
+  --green:    #00ff88;
+  --text:     #dce8ff;
+  --muted:    #3d5070;
+  --glow:     0 0 22px rgba(201,123,255,0.45);
+  --glow2:    0 0 22px rgba(0,229,255,0.35);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Space Mono', monospace;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+/* body grid bg */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(201,123,255,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(201,123,255,0.02) 1px, transparent 1px);
+  background-size: 50px 50px;
+  pointer-events: none; z-index: 0;
+}
+
+/* ======================================================
+   INTRO SCREEN
+   ====================================================== */
+.intro-screen {
+  position: fixed; inset: 0; z-index: 200;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 22px; text-align: center; padding: 24px;
+  transition: opacity .5s;
+}
+.intro-screen.hidden { opacity: 0; pointer-events: none; }
+
+.intro-logo {
+  font-family: 'Orbitron', monospace; font-size: clamp(1.8rem,5.5vw,3.6rem);
+  font-weight: 900;
+  background: linear-gradient(135deg, #c97bff, #00e5ff);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  filter: drop-shadow(0 0 24px rgba(201,123,255,.6));
+  animation: logopulse 2s ease-in-out infinite;
+}
+@keyframes logopulse {
+  0%,100% { filter: drop-shadow(0 0 16px rgba(201,123,255,.45)); }
+  50%      { filter: drop-shadow(0 0 38px rgba(201,123,255,.9)); }
+}
+.intro-sub { font-size: .68rem; color: var(--muted); letter-spacing: .3em; text-transform: uppercase; }
+.intro-desc {
+  max-width: 520px; font-size: .78rem; color: var(--text); line-height: 2; opacity: .85;
+}
+.intro-desc strong { color: var(--accent); }
+.intro-formula {
+  font-family: 'Orbitron', monospace; font-size: .7rem; color: var(--accent2);
+  background: var(--surface); border: 1px solid rgba(0,229,255,0.2);
+  padding: 12px 28px; border-radius: 8px; letter-spacing: .04em;
+  line-height: 2; text-align: left;
+}
+.btn-start {
+  font-family: 'Orbitron', monospace; font-size: .88rem; font-weight: 700;
+  padding: 14px 48px; background: linear-gradient(135deg, #c97bff, #6b00cc);
+  color: #fff; border: none; border-radius: 6px; cursor: pointer;
+  letter-spacing: .14em; text-transform: uppercase;
+  box-shadow: var(--glow); transition: all .2s;
+  animation: startbounce 1s ease-in-out infinite alternate;
+}
+@keyframes startbounce {
+  from { transform: translateY(0); box-shadow: var(--glow); }
+  to   { transform: translateY(-5px); box-shadow: 0 0 44px rgba(201,123,255,.7); }
+}
+.btn-start:hover { filter: brightness(1.12); }
+
+/* ======================================================
+   HEADER
+   ====================================================== */
+header {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(5,7,15,0.92); backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(201,123,255,0.12);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 24px; gap: 16px;
+}
+.logo {
+  font-family: 'Orbitron', monospace; font-size: clamp(.95rem,2.8vw,1.45rem);
+  font-weight: 900;
+  background: linear-gradient(135deg, #c97bff, #00e5ff);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  filter: drop-shadow(0 0 14px rgba(201,123,255,.5));
+}
+.motto { font-size: .58rem; color: var(--muted); letter-spacing: .2em; text-transform: uppercase; }
+.back-btn {
+  font-family: 'Orbitron', monospace; font-size: .54rem; color: var(--muted);
+  text-decoration: none; letter-spacing: .1em; border: 1px solid rgba(255,255,255,.08);
+  padding: 6px 12px; border-radius: 4px; transition: all .2s;
+}
+.back-btn:hover { color: var(--accent2); border-color: var(--accent2); }
+
+/* ======================================================
+   APP LAYOUT  (sidebar | canvas | info-panel)
+   ====================================================== */
+.app {
+  display: grid;
+  grid-template-columns: 250px 1fr 270px;
+  height: calc(100vh - 55px);
+  position: relative; z-index: 5;
+}
+
+/* ======================================================
+   SIDEBAR LEFT
+   ====================================================== */
+.sidebar {
+  background: var(--surface);
+  border-right: 1px solid rgba(201,123,255,0.1);
+  display: flex; flex-direction: column; gap: 0; overflow-y: auto;
+}
+.panel {
+  padding: 13px 15px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.panel-title {
+  font-family: 'Orbitron', monospace; font-size: .55rem; letter-spacing: .24em;
+  color: var(--accent); text-transform: uppercase;
+  padding-bottom: 8px; border-bottom: 1px solid rgba(201,123,255,.15);
+  margin-bottom: 10px;
+}
+
+/* Level buttons */
+.level-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.lvl-btn {
+  background: var(--surface2); border: 1px solid rgba(201,123,255,.15);
+  color: var(--text); font-family: 'Space Mono', monospace; font-size: .58rem;
+  padding: 8px 6px; cursor: pointer; border-radius: 4px; text-align: center;
+  line-height: 1.45; transition: all .2s;
+}
+.lvl-btn:hover { border-color: var(--accent); color: var(--accent); }
+.lvl-btn.active { background: rgba(201,123,255,.1); border-color: var(--accent); color: var(--accent); box-shadow: var(--glow); }
+.lvl-btn.completed { border-color: var(--green); color: var(--green); }
+.lvl-icon { font-size: 1rem; display: block; margin-bottom: 2px; }
+
+/* Scenario info panel */
+.info-rows { display: flex; flex-direction: column; gap: 7px; }
+.info-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: .62rem; padding: 5px 0;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+.info-row:last-child { border-bottom: none; }
+.info-lbl { color: var(--muted); }
+.info-val { font-family: 'Orbitron', monospace; font-size: .72rem; font-weight: 700; color: var(--accent); }
+.info-val.cyan  { color: var(--accent2); }
+.info-val.lime  { color: var(--accent3); }
+.info-val.amber { color: var(--accent4); }
+
+/* Speed input */
+.input-wrap { display: flex; align-items: center; gap: 8px; }
+input[type=number] {
+  -webkit-appearance: none; width: 100%; height: 38px;
+  background: var(--surface2); border: 1px solid rgba(201,123,255,.28);
+  border-radius: 4px; color: var(--accent); font-family: 'Orbitron', monospace;
+  font-size: .92rem; font-weight: 700; text-align: center; outline: none;
+  transition: border-color .2s, box-shadow .2s; padding: 0 8px;
+}
+input[type=number]:focus { border-color: var(--accent); box-shadow: var(--glow); }
+input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+.input-unit { font-size: .6rem; color: var(--muted); white-space: nowrap; min-width: 32px; }
+.input-error { font-size: .54rem; color: var(--red); min-height: 14px; }
+
+/* Buttons */
+.btn {
+  font-family: 'Orbitron', monospace; font-size: .62rem; letter-spacing: .1em;
+  padding: 10px 14px; border: none; cursor: pointer; border-radius: 4px;
+  transition: all .2s; text-transform: uppercase; width: 100%;
+}
+.btn-go {
+  background: linear-gradient(135deg, #c97bff, #6b00cc);
+  color: #fff; font-weight: 700; box-shadow: var(--glow);
+}
+.btn-go:hover { filter: brightness(1.12); transform: translateY(-1px); }
+.btn-go:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+.btn-reset { background: transparent; color: var(--muted); border: 1px solid rgba(255,255,255,.1); }
+.btn-reset:hover { color: var(--text); border-color: rgba(255,255,255,.2); }
+
+/* Formula toggle */
+.formula-toggle {
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  font-size: .62rem; color: var(--muted);
+}
+.toggle-track {
+  width: 34px; height: 18px; border-radius: 20px;
+  background: var(--surface3); border: 1px solid rgba(201,123,255,.2);
+  position: relative; transition: background .2s; flex-shrink: 0;
+}
+.toggle-thumb {
+  position: absolute; top: 2px; left: 2px; width: 12px; height: 12px;
+  border-radius: 50%; background: var(--muted); transition: all .2s;
+}
+.toggle-track.on { background: rgba(201,123,255,.3); border-color: var(--accent); }
+.toggle-track.on .toggle-thumb { transform: translateX(16px); background: var(--accent); }
+
+/* Stats grid */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.stat-box { background: var(--surface2); border: 1px solid rgba(201,123,255,.1); border-radius: 4px; padding: 8px; text-align: center; }
+.stat-val { font-family: 'Orbitron', monospace; font-size: .82rem; color: var(--accent3); font-weight: 700; }
+.stat-lbl { font-size: .5rem; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+
+/* ======================================================
+   CANVAS AREA
+   ====================================================== */
+.canvas-area {
+  display: flex; flex-direction: column; position: relative;
+  background: var(--bg); overflow: hidden;
+}
+.obj-bar {
+  background: rgba(201,123,255,.04); border-bottom: 1px solid rgba(201,123,255,.1);
+  padding: 8px 18px; display: flex; align-items: center; gap: 14px;
+  font-size: .63rem; flex-wrap: wrap;
+}
+.obj-label { color: var(--accent); font-weight: 700; letter-spacing: .1em; white-space: nowrap; text-transform: uppercase; }
+.obj-text { color: var(--text); flex: 1; line-height: 1.5; }
+.attempt-badge {
+  background: var(--surface2); border: 1px solid rgba(0,229,255,.28);
+  color: var(--accent2); padding: 2px 10px; border-radius: 20px;
+  font-size: .58rem; white-space: nowrap;
+}
+#gameCanvas { flex: 1; display: block; background: transparent; }
+
+/* result pill */
+.result-pill {
+  display: none; padding: 6px 14px; border-radius: 4px;
+  font-family: 'Orbitron', monospace; font-size: .6rem; font-weight: 700;
+  letter-spacing: .1em; text-align: center; border: 1px solid;
+}
+.result-pill.success { background: rgba(0,255,136,.1); border-color: rgba(0,255,136,.4); color: var(--green); display: block; }
+.result-pill.fail    { background: rgba(255,51,85,.1);  border-color: rgba(255,51,85,.4);  color: var(--red);   display: block; }
+
+/* ======================================================
+   RIGHT SIDEBAR  (calcs + result)
+   ====================================================== */
+.sidebar-right {
+  background: var(--surface);
+  border-left: 1px solid rgba(201,123,255,.1);
+  display: flex; flex-direction: column; gap: 0; overflow-y: auto;
+}
+
+/* calculation steps */
+.calc-block {
+  background: var(--surface2); border-radius: 6px; padding: 10px;
+  border: 1px solid rgba(201,123,255,.1);
+  font-size: .6rem; line-height: 2;
+}
+.calc-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.calc-eq { color: var(--muted); font-size: .6rem; flex: 1; }
+.calc-res { font-family: 'Orbitron', monospace; font-size: .68rem; font-weight: 700; color: var(--accent); white-space: nowrap; }
+.calc-res.good { color: var(--green); }
+.calc-res.bad  { color: var(--red); }
+
+/* status box */
+.status-box {
+  border-radius: 6px; padding: 10px; text-align: center;
+  font-family: 'Orbitron', monospace; font-size: .65rem; font-weight: 700; letter-spacing: .1em;
+  border: 1px solid;
+}
+.status-idle { background: rgba(255,255,255,.03); border-color: rgba(255,255,255,.07); color: var(--muted); }
+.status-ok   { background: rgba(0,255,136,.08);   border-color: rgba(0,255,136,.3);  color: var(--green); }
+.status-fail { background: rgba(255,51,85,.08);    border-color: rgba(255,51,85,.3);  color: var(--red); }
+.status-warn { background: rgba(255,225,53,.07);   border-color: rgba(255,225,53,.3); color: var(--accent4); }
+
+/* formula mode area */
+.formula-panel { display: none; flex-direction: column; gap: 0; }
+.formula-panel.visible { display: flex; }
+
+/* ── DIFFICULTY SELECTOR ── */
+.diff-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; }
+.diff-btn {
+  font-family: 'Orbitron', monospace; font-size: .52rem; font-weight: 700;
+  letter-spacing: .08em; padding: 7px 4px; border-radius: 4px; cursor: pointer;
+  text-transform: uppercase; text-align: center; border: 1px solid;
+  transition: all .18s; background: var(--surface2);
+}
+.diff-btn.easy   { color: var(--green);   border-color: rgba(0,255,136,.2); }
+.diff-btn.medium { color: var(--accent4); border-color: rgba(255,225,53,.2); }
+.diff-btn.hard   { color: var(--red);     border-color: rgba(255,51,85,.2); }
+.diff-btn.active.easy   { background: rgba(0,255,136,.1);   border-color: var(--green);   box-shadow: 0 0 10px rgba(0,255,136,.25); }
+.diff-btn.active.medium { background: rgba(255,225,53,.08); border-color: var(--accent4); box-shadow: 0 0 10px rgba(255,225,53,.2); }
+.diff-btn.active.hard   { background: rgba(255,51,85,.08);  border-color: var(--red);     box-shadow: 0 0 10px rgba(255,51,85,.2); }
+.diff-sublabel { font-size: .5rem; color: var(--muted); text-align: center; margin-top: 6px; letter-spacing: .08em; }
+
+/* ── ANSWER REVEAL BOX ── */
+.answer-box {
+  border-radius: 6px; padding: 11px 12px;
+  border: 1px solid rgba(201,123,255,.18);
+  background: rgba(201,123,255,.04);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.answer-row { display: flex; justify-content: space-between; align-items: center; font-size: .6rem; }
+.answer-lbl { color: var(--muted); }
+.answer-val { font-family: 'Orbitron', monospace; font-size: .72rem; font-weight: 700; }
+.answer-val.correct { color: var(--green); }
+.answer-val.yours   { color: var(--accent); }
+.answer-val.error-good { color: var(--green); }
+.answer-val.error-bad  { color: var(--red); }
+.answer-verdict {
+  margin-top: 4px; padding: 5px 8px; border-radius: 4px; font-size: .58rem;
+  font-family: 'Orbitron', monospace; letter-spacing: .08em; text-align: center;
+  font-weight: 700;
+}
+.answer-verdict.pass { background: rgba(0,255,136,.1); color: var(--green); border: 1px solid rgba(0,255,136,.3); }
+.answer-verdict.fail { background: rgba(255,51,85,.08); color: var(--red);   border: 1px solid rgba(255,51,85,.25); }
+.answer-verdict.idle { background: rgba(255,255,255,.03); color: var(--muted); border: 1px solid rgba(255,255,255,.07); }
+
+/* ======================================================
+   FEEDBACK OVERLAY
+   ====================================================== */
+.feedback-overlay {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(5,7,15,.86); z-index: 50; opacity: 0; pointer-events: none;
+  transition: opacity .3s; backdrop-filter: blur(5px);
+}
+.feedback-overlay.visible { opacity: 1; pointer-events: all; }
+.feedback-card {
+  background: var(--surface); border: 1px solid rgba(201,123,255,.2);
+  border-radius: 12px; padding: 32px; max-width: 500px; width: 92%;
+  text-align: center; box-shadow: 0 0 60px rgba(201,123,255,.08);
+}
+.feedback-card.success { border-color: var(--green); box-shadow: 0 0 60px rgba(0,255,136,.1); }
+.feedback-card.fail    { border-color: var(--red);   box-shadow: 0 0 60px rgba(255,51,85,.1); }
+.fb-icon { font-size: 3rem; margin-bottom: 10px; }
+.fb-title { font-family: 'Orbitron', monospace; font-size: 1.35rem; font-weight: 900; margin-bottom: 8px; }
+.success .fb-title { color: var(--green); }
+.fail    .fb-title { color: var(--red); }
+.fb-msg  { font-size: .7rem; color: var(--muted); line-height: 1.7; margin-bottom: 14px; }
+.fb-edu  {
+  background: rgba(201,123,255,.05); border: 1px solid rgba(201,123,255,.18);
+  border-radius: 8px; padding: 12px; font-size: .64rem; color: var(--accent);
+  margin-bottom: 16px; line-height: 1.75; text-align: left;
+}
+.fb-edu strong { color: var(--text); }
+.fb-edu .step { margin-bottom: 4px; }
+.fb-btns { display: flex; gap: 8px; }
+.fb-btn {
+  flex: 1; font-family: 'Orbitron', monospace; font-size: .6rem; padding: 10px;
+  border: none; border-radius: 4px; cursor: pointer; text-transform: uppercase;
+  letter-spacing: .1em; transition: all .2s;
+}
+.fb-retry { background: rgba(255,51,85,.12); color: var(--red); border: 1px solid rgba(255,51,85,.3); }
+.fb-retry:hover { background: rgba(255,51,85,.22); }
+.fb-next  { background: linear-gradient(135deg, var(--green), #00cc66); color: var(--bg); font-weight: 700; }
+.fb-next:hover { filter: brightness(1.12); }
+
+/* ======================================================
+   PARTICLES
+   ====================================================== */
+.particle {
+  position: fixed; pointer-events: none; border-radius: 50%;
+  animation: pfly 1s ease-out forwards;
+}
+@keyframes pfly {
+  from { opacity:1; transform:translate(0,0) scale(1); }
+  to   { opacity:0; transform:translate(var(--dx),var(--dy)) scale(0); }
+}
+
+/* ======================================================
+   RESPONSIVE
+   ====================================================== */
+@media (max-width: 960px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; height: auto; }
+  .sidebar      { order: 3; max-height: 280px; }
+  .sidebar-right{ order: 2; max-height: 260px; }
+  .canvas-area  { order: 1; min-height: 340px; }
+  #gameCanvas   { min-height: 280px; }
+}
+@media (max-width: 600px) {
+  .motto { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════ INTRO ══════════════════════ -->
+<div class="intro-screen" id="introScreen">
+  <div class="intro-logo">🚗 OVERTAKE CHALLENGE</div>
+  <div class="intro-sub">Relative Motion · Speed · Distance · Time</div>
+  <div class="intro-desc">
+    You're on the highway. A truck is blocking your lane.<br>
+    <strong>Calculate the minimum speed</strong> to overtake it safely.<br>
+    Apply relative motion physics — no guessing.
+  </div>
+  <div class="intro-formula">
+    Vr = Vplayer − Vtruck &nbsp;|&nbsp; D = L₁ + L₂ + gap<br>
+    t = D / Vr &nbsp;|&nbsp; X = V × t
+  </div>
+  <button class="btn-start" onclick="startGame()">⚡ START CHALLENGE →</button>
+</div>
+
+<!-- ══════════════════════ HEADER ══════════════════════ -->
+<header>
+  <a href="index.html" class="back-btn">← HOME</a>
+  <div class="logo">🚗 OVERTAKE CHALLENGE</div>
+  <div class="motto">Relative Motion · Speed · Time · Distance</div>
+</header>
+
+<!-- ══════════════════════ APP ══════════════════════ -->
+<div class="app">
+
+  <!-- ─── LEFT SIDEBAR ─── -->
+  <div class="sidebar">
+
+    <div class="panel">
+      <div class="panel-title">Mission Select</div>
+      <div class="level-grid" id="levelGrid"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Scenario</div>
+      <div class="info-rows">
+        <div class="info-row"><span class="info-lbl">Vehicle Ahead</span><span class="info-val amber" id="infoAhead">—</span></div>
+        <div class="info-row"><span class="info-lbl">Vehicle Speed</span><span class="info-val" id="infoVtruck">—</span></div>
+        <div class="info-row"><span class="info-lbl">Vehicle Length</span><span class="info-val cyan" id="infoLtruck">—</span></div>
+        <div class="info-row"><span class="info-lbl">Your Car Length</span><span class="info-val cyan" id="infoLcar">—</span></div>
+        <div class="info-row"><span class="info-lbl">Initial Gap</span><span class="info-val lime" id="infoGap">—</span></div>
+        <div class="info-row"><span class="info-lbl">Safety Buffer</span><span class="info-val lime" id="infoSafety">—</span></div>
+        <div class="info-row"><span class="info-lbl">Oncoming Speed</span><span class="info-val" id="infoOncoming" style="color:var(--red)">N/A</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Difficulty</div>
+      <div class="diff-grid">
+        <button class="diff-btn easy"   onclick="setDifficulty('easy')"   id="diffEasy">EASY</button>
+        <button class="diff-btn medium active" onclick="setDifficulty('medium')" id="diffMedium">MEDIUM</button>
+        <button class="diff-btn hard"   onclick="setDifficulty('hard')"   id="diffHard">HARD</button>
+      </div>
+      <div class="diff-sublabel" id="diffSubLabel">Tolerance: ±5 km/h from correct answer</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Your Speed Input</div>
+      <div style="display:flex;flex-direction:column;gap:7px;">
+        <div style="display:flex;justify-content:space-between;font-size:.62rem;color:var(--muted)">
+          <span>Player Speed</span>
+          <span style="color:var(--accent);font-size:.55rem">km/h</span>
+        </div>
+        <div class="input-wrap">
+          <input type="number" id="speedInput" min="1" max="300" step="1" value="80" placeholder="km/h">
+          <span class="input-unit">km/h</span>
+        </div>
+        <div class="input-error" id="speedError"></div>
+        <div style="font-size:.54rem;color:rgba(201,123,255,.5)">Press Enter or click START OVERTAKE</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Formula Mode</div>
+      <label class="formula-toggle" id="fmodeToggle" onclick="toggleFormulaMode()">
+        <div class="toggle-track" id="toggleTrack"><div class="toggle-thumb" id="toggleThumb"></div></div>
+        <span id="toggleLabel">Show Step-by-Step</span>
+      </label>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Result Pill</div>
+      <div class="result-pill" id="resultPill">Awaiting run…</div>
+    </div>
+
+    <div class="panel">
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="btn btn-go" id="goBtn" onclick="startOvertake()">⚡ START OVERTAKE</button>
+        <button class="btn btn-reset" onclick="resetRun()">↺ RESET</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Flight Data</div>
+      <div class="stats-grid">
+        <div class="stat-box"><div class="stat-val" id="statVr">—</div><div class="stat-lbl">Rel. Speed</div></div>
+        <div class="stat-box"><div class="stat-val" id="statD">—</div><div class="stat-lbl">Dist (m)</div></div>
+        <div class="stat-box"><div class="stat-val" id="statT">—</div><div class="stat-lbl">Time (s)</div></div>
+        <div class="stat-box"><div class="stat-val" id="statXp">—</div><div class="stat-lbl">Car Δ (m)</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ─── CANVAS ─── -->
+  <div class="canvas-area">
+    <div class="obj-bar">
+      <span class="obj-label">MISSION:</span>
+      <span class="obj-text" id="objText">Select a level and calculate the minimum speed to overtake safely.</span>
+      <span class="attempt-badge" id="attemptBadge">ATTEMPTS: 0</span>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Feedback overlay -->
+    <div class="feedback-overlay" id="feedbackOverlay">
+      <div class="feedback-card" id="feedbackCard">
+        <div class="fb-icon"  id="fbIcon"></div>
+        <div class="fb-title" id="fbTitle"></div>
+        <div class="fb-msg"   id="fbMsg"></div>
+        <div class="fb-edu"   id="fbEdu"></div>
+        <div class="fb-btns">
+          <button class="fb-btn fb-retry" onclick="closeFeedback()">↺ RETRY</button>
+          <button class="fb-btn fb-next"  id="fbNext" onclick="nextLevel()">NEXT LEVEL →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── RIGHT SIDEBAR ─── -->
+  <div class="sidebar-right">
+
+    <div class="panel">
+      <div class="panel-title">Circuit Status</div>
+      <div class="status-box status-idle" id="statusBox">READY</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Live Calculation</div>
+      <div class="calc-block" id="calcBlock">
+        <div class="calc-row"><span class="calc-eq">Run to calculate</span><span class="calc-res">—</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Answer Check</div>
+      <div class="answer-box">
+        <div class="answer-row">
+          <span class="answer-lbl">Correct Speed</span>
+          <span class="answer-val correct" id="ansCorrect">— km/h</span>
+        </div>
+        <div class="answer-row">
+          <span class="answer-lbl">Your Answer</span>
+          <span class="answer-val yours" id="ansYours">— km/h</span>
+        </div>
+        <div class="answer-row">
+          <span class="answer-lbl">Error</span>
+          <span class="answer-val" id="ansError">—</span>
+        </div>
+        <div class="answer-row">
+          <span class="answer-lbl">Tolerance</span>
+          <span class="answer-val" id="ansTolerance" style="color:var(--muted)">± — km/h</span>
+        </div>
+        <div class="answer-verdict idle" id="ansVerdict">AWAITING RUN</div>
+      </div>
+    </div>
+
+    <div class="panel formula-panel" id="formulaPanel">
+      <div class="panel-title">Step-by-Step Workings</div>
+      <div class="calc-block" id="formulaBlock">
+        <div class="calc-row"><span class="calc-eq">Enable Formula Mode</span><span class="calc-res">↑</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Relative Motion Reference</div>
+      <div style="font-size:.62rem;line-height:2.2;color:var(--muted);">
+        <div><span style="color:var(--accent)">Vr = V₁ − V₂</span> &nbsp; Relative speed</div>
+        <div><span style="color:var(--accent)">t = D / Vr</span> &nbsp; Time to overtake</div>
+        <div><span style="color:var(--accent)">X = V × t</span> &nbsp; Distance covered</div>
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.05)">
+          <div style="color:var(--accent2);font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Total Overtake Distance</div>
+          <div>D = L_truck + L_car + safety</div>
+          <div style="margin-top:6px;color:var(--accent2);font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Opposite Direction</div>
+          <div>Vr = V₁ + V₂</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Vehicle Status</div>
+      <div id="vehicleStatus" style="display:flex;flex-direction:column;gap:6px;"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════ SCRIPT ══════════════════════ -->
+<script>
+'use strict';
+
+// ============================================================
+// LEVEL DATA
+// ============================================================
+const LEVELS = [
+  {
+    id: 1, name: 'Slow Truck', icon: '🚛',
+    desc: 'Overtake slow truck on country road',
+    objective: 'Overtake the slow truck. Calculate minimum speed using Vr = Vplayer − Vtruck and t = D / Vr.',
+    // vehicle ahead
+    aheadName:   'Slow Truck',
+    aheadSpeed:  40,    // km/h
+    aheadLength: 12,    // m
+    // player car
+    carLength:   4,     // m
+    initialGap:  20,    // m (starting distance behind truck)
+    safetyBuffer:5,     // m (clearance needed after passing)
+    oncomingSpeed: 0,   // 0 = no oncoming traffic
+    // physics limits
+    minSafeRelSpeed: 5, // m/s relative speed minimum to attempt overtake
+    // success condition: player must have Vr > minSafeRelSpeed AND clears truck
+    successFact: `✅ <strong>Level 1 cleared!</strong><br>
+      <div class="step">Vr = Vplayer − Vtruck (same direction)</div>
+      <div class="step">D = L_truck + L_car + safety gap</div>
+      <div class="step">t = D / Vr → time exposed in oncoming lane</div>
+      <div class="step">Lower relative speed → more time in danger zone!</div>`,
+    failFact: `❌ <strong>Overtake failed.</strong><br>
+      <div class="step">You need Vr = Vplayer − 11.11 m/s (truck at 40 km/h)</div>
+      <div class="step">D = 12 + 4 + 5 = 21 m to clear</div>
+      <div class="step">Minimum Vplayer: truck speed + safe relative speed</div>`,
+  },
+  {
+    id: 2, name: 'City Bus', icon: '🚌',
+    desc: 'Overtake a city bus on a main road',
+    objective: 'Overtake the bus (longer vehicle!). More distance to cover — you need more speed.',
+    aheadName:   'City Bus',
+    aheadSpeed:  50,
+    aheadLength: 18,
+    carLength:   4,
+    initialGap:  25,
+    safetyBuffer: 6,
+    oncomingSpeed: 0,
+    minSafeRelSpeed: 6,
+    successFact: `✅ <strong>Bus overtaken!</strong><br>
+      <div class="step">Longer vehicles → larger D → more time needed</div>
+      <div class="step">D = 18 + 4 + 6 = 28 m for this level</div>
+      <div class="step">At Vr = 8 m/s: t = 28/8 = 3.5 s in opposite lane</div>`,
+    failFact: `❌ <strong>Not fast enough!</strong><br>
+      <div class="step">Bus speed = 50 km/h = 13.89 m/s</div>
+      <div class="step">D = 18 + 4 + 6 = 28 m total</div>
+      <div class="step">Need higher relative speed to clear 28 m quickly</div>`,
+  },
+  {
+    id: 3, name: 'Train Pass', icon: '🚂',
+    desc: 'Passenger train overtakes freight train',
+    objective: 'Train overtaking a freight train. Enormous length → calculate very carefully!',
+    aheadName:   'Freight Train',
+    aheadSpeed:  60,
+    aheadLength: 200,   // freight train!
+    carLength:   80,    // passenger train
+    initialGap:  50,
+    safetyBuffer: 20,
+    oncomingSpeed: 0,
+    minSafeRelSpeed: 10,
+    successFact: `✅ <strong>Train overtake complete!</strong><br>
+      <div class="step">D = 200 + 80 + 20 = 300 m — huge distance!</div>
+      <div class="step">At Vr = 15 m/s: t = 300/15 = 20 s alongside freight</div>
+      <div class="step">This is why freight trains use parallel tracks!</div>`,
+    failFact: `❌ <strong>Not enough relative speed!</strong><br>
+      <div class="step">Freight at 60 km/h = 16.67 m/s</div>
+      <div class="step">D = 200 + 80 + 20 = 300 m</div>
+      <div class="step">Need significant speed advantage for 300 m clearance</div>`,
+  },
+  {
+    id: 4, name: 'Oncoming!', icon: '⚠️',
+    desc: 'Overtake with oncoming vehicle — time is critical!',
+    objective: 'DANGER: Oncoming vehicle at 80 km/h! Relative closing speed is V₁ + V₂. Calculate wisely.',
+    aheadName:   'Truck',
+    aheadSpeed:  50,
+    aheadLength: 12,
+    carLength:   4,
+    initialGap:  20,
+    safetyBuffer: 8,
+    oncomingSpeed: 80,   // km/h oncoming traffic
+    minSafeRelSpeed: 10,
+    successFact: `✅ <strong>Cleared before oncoming vehicle!</strong><br>
+      <div class="step">Your overtake Vr = Vplayer − Vtruck (same direction)</div>
+      <div class="step">Oncoming closing Vr = Vplayer + Voncoming</div>
+      <div class="step">You must complete overtake BEFORE oncoming arrives</div>
+      <div class="step">This is why hasty overtakes are extremely dangerous!</div>`,
+    failFact: `❌ <strong>Head-on collision risk!</strong><br>
+      <div class="step">Oncoming at 80 km/h = 22.22 m/s</div>
+      <div class="step">Closing speed with you = V_you + 22.22 m/s</div>
+      <div class="step">You must clear the truck before oncoming reaches you</div>
+      <div class="step">Increase speed significantly to reduce time in danger lane</div>`,
+  },
+  {
+    id: 5, name: 'Highway', icon: '🏎️',
+    desc: 'High-speed highway: overtake convoy',
+    objective: 'High-speed highway! Overtake a fast truck convoy. Tiny gaps, high speeds — precision calculation.',
+    aheadName:   'Fast Convoy',
+    aheadSpeed:  90,
+    aheadLength: 15,
+    carLength:   4,
+    initialGap:  15,
+    safetyBuffer: 10,
+    oncomingSpeed: 0,
+    minSafeRelSpeed: 8,
+    successFact: `✅ <strong>Highway overtake complete!</strong><br>
+      <div class="step">High Vtruck means you need even higher Vplayer</div>
+      <div class="step">D = 15 + 4 + 10 = 29 m — small but fast</div>
+      <div class="step">At high speeds, small Vr improvements save seconds</div>
+      <div class="step">Highway overtaking requires 30-40% speed advantage!</div>`,
+    failFact: `❌ <strong>Convoy not cleared!</strong><br>
+      <div class="step">Convoy at 90 km/h = 25 m/s</div>
+      <div class="step">D = 15 + 4 + 10 = 29 m</div>
+      <div class="step">You need Vplayer > 90 km/h with good margin</div>
+      <div class="step">Try at least 130–140 km/h for safe relative speed</div>`,
+  }
+];
+
+// ============================================================
+// STATE
+// ============================================================
+let state = {
+  currentLevel: 0,
+  completedLevels: JSON.parse(localStorage.getItem('otc_completed') || '[]'),
+  attempts: 0,
+  isRunning: false,
+  animFrame: null,
+  animT: 0,         // animation progress 0→1
+  lastResult: null, // { success, Vr, D, t, Xplayer, Xtruck }
+  formulaMode: false,
+  difficulty: 'medium',   // 'easy' | 'medium' | 'hard'
+  // visual positions (pixels) set during animation
+  playerX: 0,
+  truckX: 0,
+  oncomingX: 0,
+};
+
+// Tolerance (km/h) for each difficulty — answer must be within ±tolerance of correct speed
+const DIFFICULTY = {
+  easy:   { label: 'EASY',   tolerance: 10, sublabel: 'Tolerance: ±10 km/h from correct answer' },
+  medium: { label: 'MEDIUM', tolerance:  5, sublabel: 'Tolerance: ±5 km/h from correct answer'  },
+  hard:   { label: 'HARD',   tolerance:  2, sublabel: 'Tolerance: ±2 km/h from correct answer'  },
+};
+
+// ============================================================
+// CANVAS
+// ============================================================
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  const area = canvas.parentElement;
+  canvas.width  = area.clientWidth;
+  canvas.height = area.clientHeight - 40;
+}
+window.addEventListener('resize', () => { resizeCanvas(); drawScene(); });
+
+// ============================================================
+// PHYSICS CALCULATIONS
+// ============================================================
+function kmhToMs(v) { return v / 3.6; }
+function msToKmh(v) { return v * 3.6; }
+
+function calcOvertake(level, playerSpeedKmh) {
+  const Vp  = kmhToMs(playerSpeedKmh);
+  const Vt  = kmhToMs(level.aheadSpeed);
+  const Von = kmhToMs(level.oncomingSpeed || 0);
+
+  const Vr  = Vp - Vt;   // relative speed (same direction)
+  const D   = level.aheadLength + level.carLength + level.safetyBuffer; // total distance to clear
+  const t   = Vr > 0 ? D / Vr : Infinity;     // time to complete overtake
+  const Xplayer = Vp * t;                      // player displacement in t seconds
+  const Xtruck  = Vt * t;                      // truck displacement in t seconds
+
+  // ── CORRECT ANSWER CALCULATION ──
+  // The minimum player speed is the exact speed that achieves exactly minSafeRelSpeed
+  // Vr_required = minSafeRelSpeed  →  Vp_min = Vt + Vr_required
+  const Vp_correct_ms  = Vt + level.minSafeRelSpeed;   // m/s
+  const correctSpeedKmh = Vp_correct_ms * 3.6;          // km/h (rounded to 1 dp for display)
+
+  // ── TOLERANCE FROM CURRENT DIFFICULTY ──
+  const tolerance = DIFFICULTY[state.difficulty].tolerance;  // km/h
+
+  // ── ONCOMING CHECK (unchanged) ──
+  let oncomingOk = true;
+  let oncomingDist = Infinity;
+  if (Von > 0) {
+    const closingVr    = Vp + Von;
+    const oncomingStart = 200; // m
+    const timeToClose  = oncomingStart / closingVr;
+    oncomingOk  = t < timeToClose;
+    oncomingDist = oncomingStart - closingVr * Math.min(t, timeToClose);
+  }
+
+  // ── TOLERANCE-BASED SUCCESS ──
+  // Player must enter a speed within ±tolerance of the correct minimum speed AND pass oncoming check.
+  // This prevents brute-forcing with 200 km/h.
+  const withinTolerance = Math.abs(playerSpeedKmh - correctSpeedKmh) <= tolerance;
+  const success = withinTolerance && oncomingOk;
+
+  // Error vs correct answer (signed, km/h)
+  const errorKmh = playerSpeedKmh - correctSpeedKmh;
+
+  return { Vp, Vt, Von, Vr, D, t, Xplayer, Xtruck,
+           oncomingOk, correctSpeedKmh, tolerance,
+           withinTolerance, errorKmh, success };
+}
+
+// ============================================================
+// START OVERTAKE
+// ============================================================
+function startOvertake() {
+  if (state.isRunning) return;
+
+  const input = document.getElementById('speedInput');
+  const err   = document.getElementById('speedError');
+  err.textContent = '';
+  const v = parseFloat(input.value);
+
+  if (isNaN(v) || v < 1 || v > 300) {
+    err.textContent = '⚠ Enter a value between 1–300 km/h';
+    return;
+  }
+
+  const level = LEVELS[state.currentLevel];
+
+  if (v <= level.aheadSpeed) {
+    err.textContent = `⚠ Your speed must exceed vehicle ahead (${level.aheadSpeed} km/h)`;
+    return;
+  }
+
+  state.attempts++;
+  document.getElementById('attemptBadge').textContent = `ATTEMPTS: ${state.attempts}`;
+  document.getElementById('goBtn').disabled = true;
+  document.getElementById('resultPill').className = 'result-pill';
+
+  const result = calcOvertake(level, v);
+  state.lastResult = result;
+
+  // Update stats display
+  document.getElementById('statVr').textContent = result.Vr.toFixed(2) + ' m/s';
+  document.getElementById('statD').textContent  = result.D.toFixed(1)  + ' m';
+  document.getElementById('statT').textContent  = result.t === Infinity ? '∞' : result.t.toFixed(2) + 's';
+  document.getElementById('statXp').textContent = result.Xplayer === Infinity ? '∞' : result.Xplayer.toFixed(1) + 'm';
+
+  buildCalcBlock(result, level, v);
+  if (state.formulaMode) buildFormulaBlock(result, level, v);
+  buildVehicleStatus(result, level);
+  updateStatus(result);
+  updateAnswerBox(result, v);
+
+  // Run animation
+  runAnimation(result, level, v);
+}
+
+// ============================================================
+// BUILD CALCULATION DISPLAYS
+// ============================================================
+function buildCalcBlock(result, level, Vp_kmh) {
+  const errSign = result.errorKmh >= 0 ? '+' : '';
+  const rows = [
+    { eq: `Vp = ${Vp_kmh} km/h = ${result.Vp.toFixed(2)} m/s`,          res: `${result.Vp.toFixed(2)} m/s` },
+    { eq: `Vt = ${level.aheadSpeed} km/h = ${result.Vt.toFixed(2)} m/s`, res: `${result.Vt.toFixed(2)} m/s` },
+    { eq: `Vr = Vp − Vt = ${result.Vp.toFixed(2)} − ${result.Vt.toFixed(2)}`, res: `${result.Vr.toFixed(2)} m/s`,
+      cls: result.Vr >= level.minSafeRelSpeed ? 'good' : 'bad' },
+    { eq: `D = ${level.aheadLength} + ${level.carLength} + ${level.safetyBuffer}`, res: `${result.D} m` },
+    { eq: `t = D / Vr = ${result.D} / ${result.Vr.toFixed(2)}`,
+      res: result.t === Infinity ? '∞' : `${result.t.toFixed(2)} s`,
+      cls: result.t < 10 ? 'good' : 'bad' },
+    { eq: `ΔX_player = Vp × t`, res: result.Xplayer === Infinity ? '∞' : `${result.Xplayer.toFixed(1)} m` },
+    { eq: `ΔX_truck  = Vt × t`, res: result.Xtruck  === Infinity ? '∞' : `${result.Xtruck.toFixed(1)} m` },
+    // ── Answer check rows ──
+    { eq: `Correct min speed = Vt + Vr_min`, res: `${result.correctSpeedKmh.toFixed(1)} km/h`, cls: 'good' },
+    { eq: `Your answer`,                      res: `${Vp_kmh} km/h`,
+      cls: result.withinTolerance ? 'good' : 'bad' },
+    { eq: `Error (answer − correct)`,         res: `${errSign}${result.errorKmh.toFixed(1)} km/h`,
+      cls: result.withinTolerance ? 'good' : 'bad' },
+    { eq: `Tolerance (${DIFFICULTY[state.difficulty].label})`, res: `±${result.tolerance} km/h` },
+  ];
+  if (level.oncomingSpeed > 0) {
+    rows.push({ eq: `Von = ${level.oncomingSpeed} km/h = ${result.Von.toFixed(2)} m/s`, res: `${result.Von.toFixed(2)} m/s` });
+    rows.push({ eq: `Closing Vr = Vp + Von`, res: `${(result.Vp + result.Von).toFixed(2)} m/s`, cls: result.oncomingOk ? 'good' : 'bad' });
+  }
+
+  document.getElementById('calcBlock').innerHTML = rows.map(r =>
+    `<div class="calc-row"><span class="calc-eq">${r.eq}</span><span class="calc-res ${r.cls||''}">${r.res}</span></div>`
+  ).join('');
+}
+
+function buildFormulaBlock(result, level, Vp_kmh) {
+  const errSign = result.errorKmh >= 0 ? '+' : '';
+  const lines = [
+    `<div class="calc-row"><span class="calc-eq"><strong>Step 1: Convert to m/s</strong></span><span class="calc-res"></span></div>`,
+    `<div class="calc-row"><span class="calc-eq">Vplayer = ${Vp_kmh} ÷ 3.6</span><span class="calc-res">${result.Vp.toFixed(2)} m/s</span></div>`,
+    `<div class="calc-row"><span class="calc-eq">Vtruck  = ${level.aheadSpeed} ÷ 3.6</span><span class="calc-res">${result.Vt.toFixed(2)} m/s</span></div>`,
+    `<div class="calc-row"><span class="calc-eq"><strong>Step 2: Relative Speed</strong></span><span class="calc-res"></span></div>`,
+    `<div class="calc-row"><span class="calc-eq">Vr = Vp − Vt (same direction)</span><span class="calc-res ${result.Vr >= level.minSafeRelSpeed?'good':'bad'}">${result.Vr.toFixed(2)} m/s</span></div>`,
+    `<div class="calc-row"><span class="calc-eq"><strong>Step 3: Overtake Distance</strong></span><span class="calc-res"></span></div>`,
+    `<div class="calc-row"><span class="calc-eq">D = ${level.aheadLength}m + ${level.carLength}m + ${level.safetyBuffer}m</span><span class="calc-res">${result.D} m</span></div>`,
+    `<div class="calc-row"><span class="calc-eq"><strong>Step 4: Time in Danger</strong></span><span class="calc-res"></span></div>`,
+    `<div class="calc-row"><span class="calc-eq">t = D ÷ Vr = ${result.D} ÷ ${result.Vr.toFixed(2)}</span><span class="calc-res ${result.t < 10 ? 'good':'bad'}">${result.t === Infinity ? '∞' : result.t.toFixed(2)+' s'}</span></div>`,
+    `<div class="calc-row"><span class="calc-eq"><strong>Step 5: Distances Covered</strong></span><span class="calc-res"></span></div>`,
+    `<div class="calc-row"><span class="calc-eq">Player moves = ${result.Vp.toFixed(2)} × ${result.t === Infinity ? '∞' : result.t.toFixed(2)}</span><span class="calc-res">${result.Xplayer === Infinity ? '∞' : result.Xplayer.toFixed(1)+' m'}</span></div>`,
+    `<div class="calc-row"><span class="calc-eq">Truck moves  = ${result.Vt.toFixed(2)} × ${result.t === Infinity ? '∞' : result.t.toFixed(2)}</span><span class="calc-res">${result.Xtruck === Infinity ? '∞' : result.Xtruck.toFixed(1)+' m'}</span></div>`,
+    `<div class="calc-row"><span class="calc-eq"><strong>Step 6: Correct Answer Check</strong></span><span class="calc-res"></span></div>`,
+    `<div class="calc-row"><span class="calc-eq">V_min = Vt + Vr_required = ${result.Vt.toFixed(2)} + ${level.minSafeRelSpeed}</span><span class="calc-res good">${result.correctSpeedKmh.toFixed(1)} km/h</span></div>`,
+    `<div class="calc-row"><span class="calc-eq">Your answer: ${Vp_kmh} km/h</span><span class="calc-res ${result.withinTolerance?'good':'bad'}">${errSign}${result.errorKmh.toFixed(1)} km/h</span></div>`,
+    `<div class="calc-row"><span class="calc-eq">Tolerance (${DIFFICULTY[state.difficulty].label}): ±${result.tolerance} km/h</span><span class="calc-res ${result.withinTolerance?'good':'bad'}">${result.withinTolerance ? '✓ PASS' : '✗ FAIL'}</span></div>`,
+    `<div class="calc-row"><span class="calc-eq"><strong>Result</strong></span><span class="calc-res ${result.success?'good':'bad'}">${result.success ? '✓ CORRECT!' : '✗ INCORRECT'}</span></div>`,
+  ];
+  document.getElementById('formulaBlock').innerHTML = lines.join('');
+}
+
+function buildVehicleStatus(result, level) {
+  const items = [
+    { label: `Your Car (${level.carLength}m)`, val: `${msToKmh(result.Vp).toFixed(0)} km/h`, ok: result.success },
+    { label: `${level.aheadName} (${level.aheadLength}m)`, val: `${level.aheadSpeed} km/h`, ok: true },
+  ];
+  if (level.oncomingSpeed > 0) {
+    items.push({ label: `Oncoming Vehicle`, val: `${level.oncomingSpeed} km/h ←`, ok: result.oncomingOk });
+  }
+  document.getElementById('vehicleStatus').innerHTML = items.map(it =>
+    `<div style="display:flex;justify-content:space-between;align-items:center;font-size:.6rem;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
+      <span>${it.ok ? '✅' : '❌'} ${it.label}</span>
+      <span style="color:${it.ok ? 'var(--green)' : 'var(--red)'};font-family:Orbitron,monospace;font-size:.65rem;">${it.val}</span>
+    </div>`
+  ).join('');
+}
+
+function updateAnswerBox(result, playerSpeedKmh) {
+  const errSign = result.errorKmh >= 0 ? '+' : '';
+  const withinTol = result.withinTolerance;
+
+  document.getElementById('ansCorrect').textContent    = result.correctSpeedKmh.toFixed(1) + ' km/h';
+  document.getElementById('ansYours').textContent      = playerSpeedKmh + ' km/h';
+  document.getElementById('ansTolerance').textContent  = '±' + result.tolerance + ' km/h';
+
+  const errEl = document.getElementById('ansError');
+  errEl.textContent  = errSign + result.errorKmh.toFixed(1) + ' km/h';
+  errEl.className    = 'answer-val ' + (withinTol ? 'error-good' : 'error-bad');
+
+  const verdict = document.getElementById('ansVerdict');
+  verdict.textContent = withinTol ? '✓ WITHIN TOLERANCE — PASS' : '✗ OUTSIDE TOLERANCE — FAIL';
+  verdict.className   = 'answer-verdict ' + (withinTol ? 'pass' : 'fail');
+}
+
+function resetAnswerBox() {
+  document.getElementById('ansCorrect').textContent   = '— km/h';
+  document.getElementById('ansYours').textContent     = '— km/h';
+  document.getElementById('ansError').textContent     = '—';
+  document.getElementById('ansError').className       = 'answer-val';
+  document.getElementById('ansTolerance').textContent = '± — km/h';
+  const verdict = document.getElementById('ansVerdict');
+  verdict.textContent = 'AWAITING RUN';
+  verdict.className   = 'answer-verdict idle';
+}
+
+function updateStatus(result) {
+  const box = document.getElementById('statusBox');
+  if (!state.lastResult) {
+    box.className = 'status-box status-idle'; box.textContent = 'READY';
+  } else if (result.Vr <= 0) {
+    box.className = 'status-box status-fail'; box.textContent = '✗ TOO SLOW';
+  } else if (!result.oncomingOk) {
+    box.className = 'status-box status-fail'; box.textContent = '⚠ ONCOMING COLLISION';
+  } else if (result.success) {
+    box.className = 'status-box status-ok'; box.textContent = '✓ CORRECT ANSWER!';
+  } else if (result.errorKmh > result.tolerance) {
+    box.className = 'status-box status-warn'; box.textContent = '⚠ TOO FAST';
+  } else if (result.errorKmh < -result.tolerance) {
+    box.className = 'status-box status-fail'; box.textContent = '✗ TOO SLOW';
+  } else {
+    box.className = 'status-box status-fail'; box.textContent = '✗ OUT OF TOLERANCE';
+  }
+}
+
+// ============================================================
+// ANIMATION
+// ============================================================
+function runAnimation(result, level, playerSpeedKmh) {
+  if (state.animFrame) cancelAnimationFrame(state.animFrame);
+  state.isRunning = true;
+  state.animT = 0;
+
+  const W = canvas.width;
+  const SCALE = W / 300; // pixels per metre
+
+  // Clamp visual duration to 3–6 seconds regardless of physics time
+  const physicsTime    = result.t === Infinity ? 5 : result.t;
+  const visualDuration = Math.max(3, Math.min(physicsTime, 6)) * 1000; // ms
+  let startTime = null;
+
+  function animate(ts) {
+    if (!startTime) startTime = ts;
+    const elapsed  = ts - startTime;
+    const progress = Math.min(elapsed / visualDuration, 1);
+    state.animT = progress;
+
+    // Map animation progress → real physics time (proportionally compressed/stretched)
+    const physTime = progress * physicsTime;
+
+    // Real-world displacements (metres) → pixels
+    const pxMovedPlayer = result.Vp * physTime * SCALE;
+    const pxMovedTruck  = result.Vt * physTime * SCALE;
+
+    drawScene(pxMovedPlayer, pxMovedTruck, progress, result, level);
+
+    if (progress < 1) {
+      state.animFrame = requestAnimationFrame(animate);
+    } else {
+      // animation done
+      state.isRunning = false;
+      document.getElementById('goBtn').disabled = false;
+
+      // Show result pill
+      const pill = document.getElementById('resultPill');
+      if (result.success) {
+        pill.className = 'result-pill success';
+        pill.textContent = '✓ OVERTAKE SUCCESS!';
+        spawnParticles();
+        markComplete();
+      } else {
+        pill.className = 'result-pill fail';
+        pill.textContent = result.Vr <= 0 ? '✗ SLOWER THAN TRUCK' :
+                           !result.oncomingOk ? '⚠ HIT ONCOMING VEHICLE' :
+                           '✗ INSUFFICIENT SPEED';
+      }
+
+      showFeedback(result, level, playerSpeedKmh);
+    }
+  }
+
+  state.animFrame = requestAnimationFrame(animate);
+}
+
+// ============================================================
+// DRAWING
+// ============================================================
+function drawScene(pxMovedPlayer = 0, pxMovedTruck = 0, progress = 0, result = null, level = null) {
+  if (!canvas.width) return;
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  drawBackground(W, H);
+  drawRoad(W, H, pxMovedPlayer, level, progress);
+  if (level) drawVehicles(W, H, pxMovedPlayer, pxMovedTruck, progress, result, level);
+  drawHUD(W, H, result, level, progress);
+}
+
+function drawBackground(W, H) {
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#05070f');
+  grad.addColorStop(0.5, '#07090e');
+  grad.addColorStop(1, '#060810');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Level watermark
+  if (state.currentLevel < LEVELS.length) {
+    ctx.font = `bold ${Math.min(H * 0.28, 120)}px Orbitron,monospace`;
+    ctx.fillStyle = 'rgba(201,123,255,0.025)';
+    ctx.textAlign = 'right';
+    ctx.fillText(LEVELS[state.currentLevel].name.toUpperCase(), W - 20, H * 0.65);
+    ctx.textAlign = 'left';
+  }
+}
+
+function drawRoad(W, H, pxMoved, level, progress) {
+  const roadTop    = H * 0.32;
+  const roadBottom = H * 0.88;
+  const roadMid    = (roadTop + roadBottom) / 2;
+  const laneH      = (roadBottom - roadTop) / 2;
+
+  // Road surface
+  const rg = ctx.createLinearGradient(0, roadTop, 0, roadBottom);
+  rg.addColorStop(0,   'rgba(14,20,38,0.9)');
+  rg.addColorStop(0.5, 'rgba(18,26,46,0.95)');
+  rg.addColorStop(1,   'rgba(14,20,38,0.9)');
+  ctx.fillStyle = rg;
+  ctx.fillRect(0, roadTop, W, roadBottom - roadTop);
+
+  // Road edges
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(0, roadTop);    ctx.lineTo(W, roadTop);    ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, roadBottom); ctx.lineTo(W, roadBottom); ctx.stroke();
+
+  // Centre dividing line (yellow dashed)
+  const dashLen = 28, gapLen = 18, totalDash = dashLen + gapLen;
+  const offset  = pxMoved % totalDash;
+  ctx.strokeStyle = 'rgba(255,225,53,0.4)'; ctx.lineWidth = 2; ctx.setLineDash([dashLen, gapLen]);
+  ctx.lineDashOffset = -offset;
+  ctx.beginPath(); ctx.moveTo(0, roadMid); ctx.lineTo(W, roadMid); ctx.stroke();
+  ctx.setLineDash([]); ctx.lineDashOffset = 0;
+
+  // Distance markers (white dashes on side of road)
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1;
+  const markerInterval = 60;
+  const markerOffset = pxMoved % markerInterval;
+  for (let x = -markerOffset; x < W; x += markerInterval) {
+    ctx.beginPath(); ctx.moveTo(x, roadTop - 8); ctx.lineTo(x, roadTop); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, roadBottom); ctx.lineTo(x, roadBottom + 8); ctx.stroke();
+  }
+
+  // Horizon glow
+  ctx.fillStyle = 'rgba(201,123,255,0.04)';
+  ctx.fillRect(0, roadTop - 24, W, 24);
+}
+
+function drawVehicles(W, H, pxMovedPlayer, pxMovedTruck, progress, result, level) {
+  const roadTop    = H * 0.32;
+  const roadBottom = H * 0.88;
+  const roadMid    = (roadTop + roadBottom) / 2;
+  const laneH      = (roadBottom - roadTop) / 2;
+  const SCALE      = W / 300;
+
+  // ── PHYSICS-BASED POSITIONING ──────────────────────────────────────────────
+  // Camera is fixed to the player car (player stays at 20% of screen width).
+  // The truck moves BACKWARD relative to the player as it is overtaken.
+  //
+  // relativeDistance = playerDistance - truckDistance  (metres)
+  // truckScreenX     = truckStart - relativeDistance × SCALE
+  //
+  // This means: as the player pulls ahead, the truck slides left off-screen.
+
+  const carW = Math.max(30, level.carLength * SCALE * 0.9);
+  const carH = laneH * 0.55;
+
+  // Player is fixed on-screen
+  const carScreenX = W * 0.2;
+
+  const truckW = Math.max(50, level.aheadLength * SCALE * 0.8);
+  const truckH = laneH * 0.65;
+  const truckLaneY = roadMid + laneH * 0.15;
+
+  // Initial separation: rear of truck is (initialGap + carLength) ahead of player front
+  const initialSepPx = (level.initialGap + level.carLength) * SCALE;
+  // Truck rear starts just ahead of player front by that separation
+  const truckRearStart = carScreenX + carW + initialSepPx;
+  const truckStartX    = truckRearStart + truckW; // truckX = right edge (front of truck)
+
+  // As time progresses, player gains on truck by relativeDisplacement pixels
+  const relativeDisplacement = pxMovedPlayer - pxMovedTruck; // > 0 means player gaining
+  const truckX = truckStartX - relativeDisplacement;
+
+  // ── LANE CHANGE ─────────────────────────────────────────────────────────────
+  // Smooth sine-curve lane change: right lane → left lane → right lane
+  const overtakeProgress = Math.sin(progress * Math.PI);
+  const baseLaneY     = roadMid + laneH * 0.15 + carH * 0.1; // right lane
+  const overtakeLaneY = roadMid - laneH * 0.7;               // left lane (oncoming side)
+  const carLaneY      = baseLaneY - overtakeProgress * (baseLaneY - overtakeLaneY);
+
+  // ── DRAW TRUCK ──────────────────────────────────────────────────────────────
+  drawTruck(truckX - truckW, truckLaneY, truckW, truckH, level.aheadName);
+
+  // ── ONCOMING VEHICLE ────────────────────────────────────────────────────────
+  if (level.oncomingSpeed > 0 && result) {
+    // In player-fixed camera: oncoming starts 200m ahead of player front.
+    // Closing speed = Vp + Von (approaching each other head-on).
+    const physTime       = progress * (result.t === Infinity ? 5 : result.t);
+    const closingSpeed   = result.Vp + result.Von; // m/s
+    const oncomingStartPx = carScreenX + carW + 200 * SCALE;
+    const onX = oncomingStartPx - closingSpeed * physTime * SCALE;
+    if (onX > -80 && onX < W + 40) {
+      const onLaneY = roadMid - laneH * 0.7;
+      drawOncomingVehicle(onX, onLaneY, 48, laneH * 0.55);
+    }
+  }
+
+  // ── DRAW PLAYER CAR ─────────────────────────────────────────────────────────
+  drawPlayerCar(carScreenX, carLaneY, carW, carH, result, progress);
+
+  // ── GAP ANNOTATION ──────────────────────────────────────────────────────────
+  if (progress < 0.85) {
+    const playerFront = carScreenX + carW;
+    const truckRear   = truckX - truckW;
+    if (truckRear > playerFront + 5) {
+      const gapY = roadBottom + 18;
+      ctx.strokeStyle = 'rgba(0,229,255,0.35)'; ctx.lineWidth = 1; ctx.setLineDash([4,6]);
+      ctx.beginPath(); ctx.moveTo(playerFront, gapY); ctx.lineTo(truckRear, gapY); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(0,229,255,0.7)';
+      ctx.font = 'bold 9px Space Mono,monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`← gap →`, (playerFront + truckRear) / 2, gapY + 13);
+      ctx.textAlign = 'left';
+    }
+  }
+
+  // ── SPEED READOUTS ───────────────────────────────────────────────────────────
+  ctx.font = 'bold 9px Orbitron,monospace';
+  ctx.fillStyle = 'rgba(255,225,53,0.8)';
+  ctx.textAlign = 'center';
+  ctx.fillText(`${level.aheadSpeed}km/h`, truckX - truckW * 1.5, truckLaneY - truckH / 2 - 8);
+  ctx.fillStyle = 'rgba(201,123,255,0.9)';
+  const spVal = parseFloat(document.getElementById('speedInput').value) || level.aheadSpeed + 20;
+  ctx.fillText(`${spVal}km/h`, carScreenX + carW / 2, carLaneY - carH / 2 - 8);
+  ctx.textAlign = 'left';
+}
+
+function drawTruck(x, y, w, h, name) {
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fillRect(x + 4, y + h * 0.1 + 4, w, h * 0.8);
+
+  // Body
+  const tg = ctx.createLinearGradient(x, y, x + w, y);
+  tg.addColorStop(0, 'rgba(30,50,90,0.9)');
+  tg.addColorStop(0.5, 'rgba(38,62,108,0.95)');
+  tg.addColorStop(1, 'rgba(24,40,75,0.9)');
+  ctx.fillStyle = tg;
+  ctx.strokeStyle = 'rgba(0,229,255,0.25)';
+  ctx.lineWidth = 1.5;
+  roundRect2(ctx, x, y, w, h * 0.8, 5);
+  ctx.fill(); ctx.stroke();
+
+  // Windows
+  ctx.fillStyle = 'rgba(255,255,255,0.06)';
+  for (let i = 0; i < 4; i++) {
+    ctx.fillRect(x + w * 0.1 + i * w * 0.2, y + h * 0.08, w * 0.14, h * 0.32);
+  }
+
+  // Cab
+  ctx.fillStyle = 'rgba(44,70,120,0.9)';
+  roundRect2(ctx, x + w * 0.82, y - h * 0.1, w * 0.18, h * 0.7, 4);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(200,230,255,0.15)';
+  ctx.fillRect(x + w * 0.84, y - h * 0.07, w * 0.12, h * 0.28);
+
+  // Headlights
+  ctx.fillStyle = 'rgba(255,200,50,0.7)';
+  ctx.shadowColor = 'rgba(255,200,50,0.8)'; ctx.shadowBlur = 8;
+  ctx.fillRect(x + w, y + h * 0.12, 5, h * 0.18);
+  ctx.shadowBlur = 0;
+  // Tail lights
+  ctx.fillStyle = 'rgba(255,40,40,0.7)';
+  ctx.shadowColor = 'rgba(255,40,40,0.7)'; ctx.shadowBlur = 6;
+  ctx.fillRect(x - 5, y + h * 0.1, 5, h * 0.2);
+  ctx.shadowBlur = 0;
+
+  // Wheels
+  ctx.fillStyle = '#0a0e1a';
+  ctx.strokeStyle = 'rgba(100,150,200,0.3)'; ctx.lineWidth = 1;
+  [[x + w * 0.12, y + h * 0.8], [x + w * 0.35, y + h * 0.8], [x + w * 0.65, y + h * 0.8], [x + w * 0.88, y + h * 0.8]].forEach(([wx, wy]) => {
+    ctx.beginPath(); ctx.arc(wx, wy, h * 0.11, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  });
+
+  // Label
+  ctx.fillStyle = 'rgba(0,229,255,0.5)';
+  ctx.font = '7px Space Mono,monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(name.toUpperCase(), x + w / 2, y + h * 0.5 + 3);
+  ctx.textAlign = 'left';
+}
+
+function drawPlayerCar(x, y, w, h, result, progress) {
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.fillRect(x + 3, y + h * 0.8 + 3, w, h * 0.25);
+
+  // Glow (success vs fail hint)
+  const isSuccess = result && result.success;
+  ctx.shadowColor = isSuccess ? 'rgba(0,255,136,0.5)' : 'rgba(201,123,255,0.6)';
+  ctx.shadowBlur  = 14;
+
+  const cg = ctx.createLinearGradient(x, y, x, y + h);
+  cg.addColorStop(0, 'rgba(80,20,140,0.95)');
+  cg.addColorStop(0.5, 'rgba(100,30,180,0.9)');
+  cg.addColorStop(1, 'rgba(60,15,110,0.95)');
+  ctx.fillStyle = cg;
+  ctx.strokeStyle = 'rgba(201,123,255,0.8)';
+  ctx.lineWidth = 1.5;
+  roundRect2(ctx, x, y, w, h * 0.75, 5);
+  ctx.fill(); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Windshield
+  ctx.fillStyle = 'rgba(200,230,255,0.18)';
+  ctx.fillRect(x + w * 0.55, y + h * 0.06, w * 0.3, h * 0.32);
+  // Side window
+  ctx.fillRect(x + w * 0.22, y + h * 0.06, w * 0.28, h * 0.28);
+
+  // Headlights
+  ctx.fillStyle = 'rgba(255,230,100,0.85)';
+  ctx.shadowColor = 'rgba(255,230,100,0.9)'; ctx.shadowBlur = 10;
+  ctx.fillRect(x + w - 3, y + h * 0.1, 4, h * 0.16);
+  ctx.shadowBlur = 0;
+
+  // Tail lights
+  ctx.fillStyle = 'rgba(255,40,40,0.8)';
+  ctx.fillRect(x - 3, y + h * 0.1, 4, h * 0.16);
+
+  // Wheels
+  ctx.fillStyle = '#050810';
+  ctx.strokeStyle = 'rgba(201,123,255,0.4)'; ctx.lineWidth = 1;
+  [[x + w * 0.18, y + h * 0.75], [x + w * 0.82, y + h * 0.75]].forEach(([wx, wy]) => {
+    ctx.beginPath(); ctx.arc(wx, wy, h * 0.14, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  });
+
+  // "YOU" label
+  ctx.fillStyle = 'rgba(201,123,255,0.8)';
+  ctx.font = '7px Orbitron,monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('YOU', x + w / 2, y + h * 0.45);
+  ctx.textAlign = 'left';
+
+  // Speed trace particles
+  if (progress > 0 && progress < 1) {
+    for (let i = 0; i < 3; i++) {
+      const px = x - Math.random() * 20;
+      const py = y + h * 0.5 + (Math.random() - 0.5) * h * 0.4;
+      const alpha = (1 - Math.random()) * 0.5;
+      ctx.fillStyle = `rgba(201,123,255,${alpha})`;
+      ctx.beginPath(); ctx.arc(px, py, 1.5, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+}
+
+function drawOncomingVehicle(x, y, w, h) {
+  ctx.shadowColor = 'rgba(255,51,85,0.6)'; ctx.shadowBlur = 12;
+  ctx.fillStyle = 'rgba(120,20,20,0.9)';
+  ctx.strokeStyle = 'rgba(255,51,85,0.7)'; ctx.lineWidth = 1.5;
+  roundRect2(ctx, x, y, w, h * 0.75, 5);
+  ctx.fill(); ctx.stroke();
+  ctx.shadowBlur = 0;
+  // Headlights (facing left = towards player)
+  ctx.fillStyle = 'rgba(255,255,180,0.9)';
+  ctx.shadowColor = 'rgba(255,255,180,0.9)'; ctx.shadowBlur = 16;
+  ctx.fillRect(x - 4, y + h * 0.1, 5, h * 0.2);
+  ctx.shadowBlur = 0;
+  // Warning label
+  ctx.fillStyle = 'rgba(255,51,85,0.8)';
+  ctx.font = 'bold 7px Orbitron,monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('!', x + w / 2, y + h * 0.42);
+  ctx.textAlign = 'left';
+}
+
+function drawHUD(W, H, result, level, progress) {
+  if (!result || progress === 0) return;
+  const roadBottom = H * 0.88;
+  // Progress bar
+  const barW = W * 0.4, barH = 6;
+  const barX = (W - barW) / 2, barY = roadBottom + 32;
+  ctx.fillStyle = 'rgba(255,255,255,0.07)';
+  ctx.fillRect(barX, barY, barW, barH);
+  const pColor = result.success ? '#00ff88' : (progress < 0.6 ? '#c97bff' : '#ff3355');
+  ctx.fillStyle = pColor;
+  ctx.fillRect(barX, barY, barW * Math.min(progress, 1), barH);
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.font = '8px Orbitron,monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('OVERTAKE PROGRESS', W / 2, barY - 6);
+
+  // Relative speed indicator (top left of canvas)
+  if (result) {
+    ctx.fillStyle = 'rgba(5,7,15,0.7)';
+    roundRect2(ctx, 14, 14, 130, 48, 6);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(201,123,255,0.3)'; ctx.lineWidth = 1;
+    roundRect2(ctx, 14, 14, 130, 48, 6);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(201,123,255,0.8)';
+    ctx.font = '7px Space Mono,monospace'; ctx.textAlign = 'left';
+    ctx.fillText('REL. SPEED', 22, 28);
+    ctx.fillStyle = result.Vr >= (level?.minSafeRelSpeed||5) ? '#00ff88' : '#ff3355';
+    ctx.font = 'bold 14px Orbitron,monospace';
+    ctx.fillText(result.Vr.toFixed(1) + ' m/s', 22, 50);
+  }
+  ctx.textAlign = 'left';
+}
+
+function roundRect2(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+// ============================================================
+// IDLE LOOP
+// ============================================================
+let lastIdle = 0;
+function idleLoop(t) {
+  if (!state.isRunning && t - lastIdle > 50) {
+    drawScene(); lastIdle = t;
+  }
+  requestAnimationFrame(idleLoop);
+}
+
+// ============================================================
+// FEEDBACK MODAL
+// ============================================================
+function showFeedback(result, level, playerSpeedKmh) {
+  const overlay = document.getElementById('feedbackOverlay');
+  const card    = document.getElementById('feedbackCard');
+  const nextBtn = document.getElementById('fbNext');
+
+  const ok      = result.success;
+  const errSign = result.errorKmh >= 0 ? '+' : '';
+
+  card.className = 'feedback-card ' + (ok ? 'success' : 'fail');
+  document.getElementById('fbIcon').textContent  = ok ? '✅' : '❌';
+  document.getElementById('fbTitle').textContent = ok ? 'CORRECT ANSWER!' : 'INCORRECT CALCULATION';
+
+  // Main message: exam-style comparison
+  let msg = '';
+  if (ok) {
+    msg = `Your answer of ${playerSpeedKmh} km/h is within ±${result.tolerance} km/h of the correct value. ` +
+          `Relative speed achieved: ${result.Vr.toFixed(2)} m/s. Overtake time: ${result.t.toFixed(2)} s.`;
+  } else if (result.Vr <= 0) {
+    msg = `Your speed (${playerSpeedKmh} km/h) is ≤ the truck (${level.aheadSpeed} km/h). Relative speed must be positive.`;
+  } else if (!result.oncomingOk) {
+    msg = `Correct speed but unsafe timing — oncoming traffic would arrive before the overtake completes.`;
+  } else if (result.errorKmh > result.tolerance) {
+    msg = `Your answer is too high by ${result.errorKmh.toFixed(1)} km/h. The minimum required speed is ${result.correctSpeedKmh.toFixed(1)} km/h — ` +
+          `entering higher speeds represents unsafe driving, not a valid physics solution.`;
+  } else {
+    msg = `Your answer is too low by ${Math.abs(result.errorKmh).toFixed(1)} km/h. ` +
+          `You need at least ${result.correctSpeedKmh.toFixed(1)} km/h to achieve the minimum relative speed of ${level.minSafeRelSpeed} m/s.`;
+  }
+  document.getElementById('fbMsg').textContent = msg;
+
+  // Educational block: always shows the full worked solution
+  const eduHTML = `
+    <div class="step"><strong>Worked Solution:</strong></div>
+    <div class="step">① Vtruck = ${level.aheadSpeed} km/h ÷ 3.6 = ${result.Vt.toFixed(2)} m/s</div>
+    <div class="step">② Required Vr = ${level.minSafeRelSpeed} m/s (minimum safe relative speed)</div>
+    <div class="step">③ V_min = Vtruck + Vr = ${result.Vt.toFixed(2)} + ${level.minSafeRelSpeed} = ${(result.Vt + level.minSafeRelSpeed).toFixed(2)} m/s</div>
+    <div class="step">④ V_min = ${(result.Vt + level.minSafeRelSpeed).toFixed(2)} × 3.6 = <strong>${result.correctSpeedKmh.toFixed(1)} km/h</strong></div>
+    <div class="step" style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.08)">
+      Correct speed: <strong>${result.correctSpeedKmh.toFixed(1)} km/h</strong> &nbsp;|&nbsp;
+      Your answer: <strong>${playerSpeedKmh} km/h</strong> &nbsp;|&nbsp;
+      Error: <strong style="color:${result.withinTolerance ? 'var(--green)' : 'var(--red)'}">${errSign}${result.errorKmh.toFixed(1)} km/h</strong>
+    </div>
+    <div class="step">Tolerance (${DIFFICULTY[state.difficulty].label}): ±${result.tolerance} km/h &nbsp;→&nbsp;
+      <strong style="color:${result.withinTolerance ? 'var(--green)' : 'var(--red)'}">
+        ${result.withinTolerance ? 'WITHIN TOLERANCE ✓' : 'OUTSIDE TOLERANCE ✗'}
+      </strong>
+    </div>
+    ${!ok && result.withinTolerance === false && result.Vr > 0 ? `
+    <div class="step" style="margin-top:6px;color:rgba(255,225,53,0.9)">
+      💡 Hint: Use Vr = Vplayer − Vtruck. For Vr = ${level.minSafeRelSpeed} m/s, solve for Vplayer.
+    </div>` : ''}
+  `;
+
+  document.getElementById('fbEdu').innerHTML = eduHTML;
+  nextBtn.style.display = ok && state.currentLevel < LEVELS.length - 1 ? 'block' : 'none';
+  overlay.classList.add('visible');
+}
+
+function closeFeedback() {
+  document.getElementById('feedbackOverlay').classList.remove('visible');
+}
+
+function nextLevel() {
+  closeFeedback();
+  if (state.currentLevel < LEVELS.length - 1) selectLevel(state.currentLevel + 1);
+}
+
+// ============================================================
+// DIFFICULTY SELECTOR
+// ============================================================
+function setDifficulty(d) {
+  state.difficulty = d;
+  // Update button active states
+  ['easy','medium','hard'].forEach(k => {
+    const btn = document.getElementById('diff' + k.charAt(0).toUpperCase() + k.slice(1));
+    btn.className = 'diff-btn ' + k + (k === d ? ' active' : '');
+  });
+  document.getElementById('diffSubLabel').textContent = DIFFICULTY[d].sublabel;
+  // If a run has already been made this level, recompute and re-display with new tolerance
+  if (state.lastResult) {
+    const level = LEVELS[state.currentLevel];
+    const v = parseFloat(document.getElementById('speedInput').value);
+    if (!isNaN(v) && v > 0) {
+      const result = calcOvertake(level, v);
+      state.lastResult = result;
+      buildCalcBlock(result, level, v);
+      if (state.formulaMode) buildFormulaBlock(result, level, v);
+      updateStatus(result);
+      updateAnswerBox(result, v);
+    }
+  }
+}
+
+// ============================================================
+// FORMULA MODE TOGGLE
+// ============================================================
+function toggleFormulaMode() {
+  state.formulaMode = !state.formulaMode;
+  const track = document.getElementById('toggleTrack');
+  const label = document.getElementById('toggleLabel');
+  const panel = document.getElementById('formulaPanel');
+  track.className  = 'toggle-track' + (state.formulaMode ? ' on' : '');
+  label.textContent = state.formulaMode ? 'Step-by-Step: ON' : 'Show Step-by-Step';
+  panel.className  = 'formula-panel' + (state.formulaMode ? ' visible' : '');
+  if (state.formulaMode && state.lastResult) {
+    const level = LEVELS[state.currentLevel];
+    const v = parseFloat(document.getElementById('speedInput').value) || level.aheadSpeed + 20;
+    buildFormulaBlock(state.lastResult, level, v);
+  }
+}
+
+// ============================================================
+// PARTICLES
+// ============================================================
+function spawnParticles() {
+  const colors = ['#c97bff','#00e5ff','#7fff00','#ffffff','#00ff88'];
+  const cx = canvas.getBoundingClientRect().left + canvas.width * 0.6;
+  const cy = canvas.getBoundingClientRect().top  + canvas.height * 0.5;
+  for (let i = 0; i < 22; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const ang = (i / 22) * Math.PI * 2;
+    const dist = 50 + Math.random() * 100;
+    p.style.cssText = `
+      left: ${cx}px; top: ${cy}px;
+      width: ${4 + Math.random() * 6}px; height: ${4 + Math.random() * 6}px;
+      background: ${colors[Math.floor(Math.random() * colors.length)]};
+      --dx: ${Math.cos(ang) * dist}px; --dy: ${Math.sin(ang) * dist}px;
+      position:fixed; z-index:300;
+    `;
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 1050);
+  }
+}
+
+// ============================================================
+// LEVEL MANAGEMENT
+// ============================================================
+function buildLevelButtons() {
+  const grid = document.getElementById('levelGrid');
+  grid.innerHTML = '';
+  LEVELS.forEach((lvl, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'lvl-btn'
+      + (i === state.currentLevel ? ' active' : '')
+      + (state.completedLevels.includes(i) ? ' completed' : '');
+    btn.innerHTML = `<span class="lvl-icon">${lvl.icon}</span>LVL ${lvl.id}<br>${lvl.name}`;
+    btn.onclick = () => selectLevel(i);
+    grid.appendChild(btn);
+  });
+}
+
+function updateLevelButtons() {
+  document.querySelectorAll('.lvl-btn').forEach((btn, i) => {
+    btn.className = 'lvl-btn'
+      + (i === state.currentLevel ? ' active' : '')
+      + (state.completedLevels.includes(i) ? ' completed' : '');
+  });
+}
+
+function markComplete() {
+  if (!state.completedLevels.includes(state.currentLevel)) {
+    state.completedLevels.push(state.currentLevel);
+    localStorage.setItem('otc_completed', JSON.stringify(state.completedLevels));
+    updateLevelButtons();
+  }
+}
+
+function selectLevel(idx) {
+  if (state.animFrame) cancelAnimationFrame(state.animFrame);
+  state.isRunning = false;
+  state.currentLevel = idx;
+  state.attempts = 0;
+  state.lastResult = null;
+  closeFeedback();
+
+  const level = LEVELS[idx];
+  document.getElementById('objText').textContent       = level.objective;
+  document.getElementById('attemptBadge').textContent  = 'ATTEMPTS: 0';
+  document.getElementById('infoAhead').textContent     = level.aheadName;
+  document.getElementById('infoVtruck').textContent    = level.aheadSpeed + ' km/h';
+  document.getElementById('infoLtruck').textContent    = level.aheadLength + ' m';
+  document.getElementById('infoLcar').textContent      = level.carLength + ' m';
+  document.getElementById('infoGap').textContent       = level.initialGap + ' m';
+  document.getElementById('infoSafety').textContent    = level.safetyBuffer + ' m';
+  document.getElementById('infoOncoming').textContent  = level.oncomingSpeed > 0 ? level.oncomingSpeed + ' km/h' : 'None';
+  document.getElementById('infoOncoming').style.color  = level.oncomingSpeed > 0 ? 'var(--red)' : 'var(--muted)';
+
+  document.getElementById('speedError').textContent = '';
+  document.getElementById('resultPill').className   = 'result-pill';
+  document.getElementById('statusBox').className    = 'status-box status-idle';
+  document.getElementById('statusBox').textContent  = 'READY';
+  document.getElementById('vehicleStatus').innerHTML = '';
+  document.getElementById('calcBlock').innerHTML    = '<div class="calc-row"><span class="calc-eq">Run to calculate</span><span class="calc-res">—</span></div>';
+  document.getElementById('goBtn').disabled = false;
+  resetAnswerBox();
+
+  // Reset stats
+  ['statVr','statD','statT','statXp'].forEach(id => document.getElementById(id).textContent = '—');
+
+  // Pre-fill a sensible default speed (truck speed + 30)
+  document.getElementById('speedInput').value = Math.min(level.aheadSpeed + 30, 200);
+
+  updateLevelButtons();
+  drawScene();
+}
+
+function resetRun() {
+  if (state.animFrame) cancelAnimationFrame(state.animFrame);
+  state.isRunning = false;
+  state.lastResult = null;
+  closeFeedback();
+  document.getElementById('goBtn').disabled = false;
+  document.getElementById('resultPill').className = 'result-pill';
+  document.getElementById('speedError').textContent = '';
+  document.getElementById('statusBox').className   = 'status-box status-idle';
+  document.getElementById('statusBox').textContent = 'READY';
+  ['statVr','statD','statT','statXp'].forEach(id => document.getElementById(id).textContent = '—');
+  resetAnswerBox();
+  drawScene();
+}
+
+// ============================================================
+// INPUT EVENTS
+// ============================================================
+document.getElementById('speedInput').addEventListener('input', function() {
+  const v = parseFloat(this.value);
+  if (!isNaN(v)) document.getElementById('speedError').textContent = '';
+});
+document.getElementById('speedInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') startOvertake();
+});
+
+// ============================================================
+// INIT
+// ============================================================
+function startGame() {
+  document.getElementById('introScreen').classList.add('hidden');
+  init();
+}
+
+function init() {
+  resizeCanvas();
+  buildLevelButtons();
+  selectLevel(0);
+  requestAnimationFrame(idleLoop);
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const visited = localStorage.getItem('otc_visited');
+  if (visited) {
+    document.getElementById('introScreen').classList.add('hidden');
+    init();
+  } else {
+    localStorage.setItem('otc_visited', '1');
+  }
+});
+</script>
+</body>
+</html>
